@@ -1,0 +1,5 @@
+# Persönlicher Tagesstand, Lesenotizen und Log
+data/
+__pycache__/
+*.pyc
+extension/_metadata/

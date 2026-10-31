@@ -1,0 +1,26 @@
+{
+  "day_rollover_hour": 4,
+  "anki": {
+    "profile": "User 1",
+    "decks": ["Sprachen", "Essential Spanish Vocabulary Top 5000"],
+    "new_cards": 10,
+    "review_cap": 100,
+    "max_minutes": 30,
+    "min_answer_ms": 1000
+  },
+  "leetcode": {
+    "username": "DarkCreeper03"
+  },
+  "reading": {
+    "minutes": 20,
+    "min_note_chars": 20
+  },
+  "blocked_processes": [
+    "LeagueClient.exe",
+    "LeagueClientUx.exe",
+    "LeagueClientUxRender.exe",
+    "LeagueCrashHandler64.exe",
+    "League of Legends.exe"
+  ],
+  "game_process": "League of Legends.exe"
+}

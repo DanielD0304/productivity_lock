@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Productivity Lock",
+  "version": "1.0.0",
+  "description": "Sperrt YouTube und Netflix, bis Anki, LeetCode und Lesen für heute erledigt sind.",
+  "permissions": ["declarativeNetRequest", "alarms"],
+  "host_permissions": [
+    "http://127.0.0.1:47615/*",
+    "*://*.youtube.com/*",
+    "*://youtu.be/*",
+    "*://*.youtube-nocookie.com/*",
+    "*://*.netflix.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "block",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["locked.html"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": { "extensionPath": "/locked.html" }
+    },
+    "condition": {
+      "requestDomains": ["youtube.com", "youtu.be", "youtube-nocookie.com", "netflix.com"],
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "requestDomains": ["youtube.com", "youtu.be", "youtube-nocookie.com", "netflix.com"],
+      "resourceTypes": ["sub_frame"]
+    }
+  }
+]

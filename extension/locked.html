@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Productivity Lock</title>
+  <link rel="stylesheet" href="locked.css">
+</head>
+<body>
+  <main>
+    <p class="eyebrow" id="progress">Wird geprüft …</p>
+    <h1 id="title">Erst lernen, dann der Rest.</h1>
+
+    <p class="banner" id="offline" hidden>
+      Der Lock-Dienst läuft nicht, deshalb bleibt alles gesperrt. Starte den PC neu oder führe
+      <code>install_autostart.ps1</code> aus.
+    </p>
+
+    <ul class="tasks">
+      <li class="task" id="anki">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <h2>Anki</h2>
+          <p class="detail"></p>
+          <p class="error" hidden></p>
+          <p class="hint">Auf dem Handy gelernt? Synchronisiere Anki einmal am PC.</p>
+        </div>
+      </li>
+      <li class="task" id="leetcode">
+        <span class="mark" aria-hidden="true"></span>
+        <div>
+          <h2>LeetCode</h2>
+          <p class="detail"></p>
+          <p class="error" hidden></p>
+          <a class="hint" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">Aufgabe aussuchen</a>
+        </div>
+      </li>
+      <li class="task" id="reading">
+        <span class="mark" aria-hidden="true"></span>
+        <div class="grow">
+          <h2>Lesen</h2>
+          <p class="detail"></p>
+          <p class="timer" id="timer" hidden></p>
+          <button id="start" type="button" hidden>Timer starten</button>
+          <form id="note-form" hidden>
+            <label for="note">Was hast du gelesen?</label>
+            <textarea id="note" rows="2" maxlength="1000"></textarea>
+            <p class="error" id="note-error" hidden></p>
+            <button type="submit">Abschließen</button>
+          </form>
+        </div>
+      </li>
+    </ul>
+
+    <div class="links" id="links" hidden>
+      <a class="primary" href="https://www.youtube.com/">YouTube öffnen</a>
+      <a class="primary" href="https://www.netflix.com/">Netflix öffnen</a>
+    </div>
+
+    <button class="quiet" id="refresh" type="button">Jetzt prüfen</button>
+  </main>
+  <script src="locked.js"></script>
+</body>
+</html>
