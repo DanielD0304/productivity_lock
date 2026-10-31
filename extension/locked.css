@@ -90,7 +90,7 @@ a.hint { color: var(--accent); }
 
 label { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
 
-textarea {
+textarea, input {
   display: block;
   width: 100%;
   margin-top: 4px;
@@ -118,7 +118,7 @@ button, .primary {
 }
 
 button:hover, .primary:hover { filter: brightness(1.08); }
-button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 button.quiet {
   margin-top: 16px;
@@ -130,3 +130,8 @@ button.quiet {
 }
 
 .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.joker { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.joker button.quiet { display: block; margin-top: 4px; }
+#joker-form button { margin-right: 12px; }
+#joker-form button.quiet { display: inline-block; }

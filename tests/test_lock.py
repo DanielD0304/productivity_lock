@@ -33,6 +33,7 @@ CONFIG = {
     "anki": ANKI,
     "leetcode": {"username": "someone"},
     "reading": {"minutes": 20, "min_note_chars": 20},
+    "joker": {"per_week": 1},
 }
 NOW = dt.datetime(2026, 10, 31, 12, 0)
 CREATED = dt.datetime(2026, 10, 1, 4, 0)
@@ -335,6 +336,73 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(self.leetcode_calls, 0)
 
 
+class JokerTest(ServiceTest):
+    # NOW is Saturday, 2026-10-31.
+    def at(self, *moment):
+        self.clock.value = dt.datetime(*moment).timestamp()
+
+    def test_joker_unlocks_only_today(self):
+        self.service.use_joker("krank")
+        status = self.service.status()
+        self.assertTrue(status["unlocked"])
+        self.assertEqual(status["joker"]["reason"], "krank")
+        self.at(2026, 11, 1, 3, 59)
+        self.assertTrue(self.service.status()["unlocked"])
+        self.at(2026, 11, 1, 4, 0)
+        self.assertFalse(self.service.status()["unlocked"])
+
+    def test_second_joker_in_same_week_is_refused(self):
+        self.service.use_joker("krank")
+        self.at(2026, 11, 1, 12, 0)
+        self.assertEqual(self.service.status()["joker"]["left"], 0)
+        with self.assertRaisesRegex(ValueError, "verbraucht"):
+            self.service.use_joker("nochmal")
+        self.assertFalse(self.service.status()["unlocked"])
+
+    def test_new_week_brings_new_joker_at_rollover(self):
+        self.service.use_joker("krank")
+        self.at(2026, 11, 2, 3, 59)
+        self.assertEqual(self.service.status()["joker"]["left"], 0)
+        self.at(2026, 11, 2, 4, 0)
+        self.assertEqual(self.service.status()["joker"]["left"], 1)
+        self.service.use_joker("Klausur")
+        self.assertTrue(self.service.status()["unlocked"])
+
+    def test_using_it_twice_today_costs_one(self):
+        self.service.use_joker("krank")
+        self.service.use_joker("anders")
+        status = self.service.status()["joker"]
+        self.assertEqual(status["reason"], "krank")
+        self.assertEqual(status["left"], 0)
+
+    def test_reason_is_required(self):
+        with self.assertRaisesRegex(ValueError, "warum"):
+            self.service.use_joker("  a  ")
+        self.assertEqual(self.service.status()["joker"]["left"], 1)
+
+    def test_joker_is_not_spent_when_everything_is_done(self):
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.read_fully()
+        with self.assertRaisesRegex(ValueError, "erledigt"):
+            self.service.use_joker("krank")
+        self.assertEqual(self.service.status()["joker"]["left"], 1)
+
+    def test_used_joker_survives_restart(self):
+        self.service.use_joker("krank")
+        self.at(2026, 11, 1, 12, 0)
+        self.service.status()
+        self.assertEqual(self.make_service().status()["joker"]["left"], 0)
+
+    def test_state_file_from_before_jokers_still_works(self):
+        with open(os.path.join(self.dir, "state.json"), "w", encoding="utf-8") as file:
+            json.dump({"day": "2026-10-31", "done": {}, "reading": {}}, file)
+        service = self.make_service()
+        self.assertEqual(service.status()["joker"]["left"], 1)
+        service.use_joker("krank")
+        self.assertTrue(service.status()["unlocked"])
+
+
 class EnforcerTest(unittest.TestCase):
     def make(self, running):
         self.killed = []
@@ -455,6 +523,17 @@ class ServerTest(unittest.TestCase):
         code, _, _ = self.request("/reading/start", method="POST", body={}, origin="https://evil.example")
         self.assertEqual(code, 403)
         self.assertEqual(self.service.status()["checks"]["reading"]["state"], "idle")
+
+    def test_joker_endpoint(self):
+        self.assertEqual(self.request("/joker", method="POST", body={"reason": "x"})[0], 400)
+        code, body, _ = self.request("/joker", method="POST", body={"reason": "krank"})
+        self.assertEqual(code, 200)
+        self.assertTrue(json.loads(body)["active"])
+
+    def test_foreign_website_cannot_use_joker(self):
+        code, _, _ = self.request("/joker", method="POST", body={"reason": "krank"}, origin="https://evil.example")
+        self.assertEqual(code, 403)
+        self.assertFalse(self.service.status()["joker"]["active"])
 
     def test_rebinding_host_is_refused(self):
         self.assertEqual(self.request("/status", host="evil.example:47615")[0], 403)

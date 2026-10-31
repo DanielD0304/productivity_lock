@@ -58,6 +58,18 @@
     </div>
 
     <button class="quiet" id="refresh" type="button">Jetzt prüfen</button>
+
+    <section class="joker" id="joker" hidden>
+      <p id="joker-info"></p>
+      <button class="quiet" id="joker-open" type="button" hidden>Joker einsetzen</button>
+      <form id="joker-form" hidden>
+        <label for="joker-reason">Warum brauchst du heute den Joker?</label>
+        <input id="joker-reason" type="text" maxlength="200" autocomplete="off">
+        <p class="error" id="joker-error" hidden></p>
+        <button type="submit">Heute freigeben</button>
+        <button class="quiet" id="joker-cancel" type="button">Abbrechen</button>
+      </form>
+    </section>
   </main>
   <script src="locked.js"></script>
 </body>

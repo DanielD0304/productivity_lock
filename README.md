@@ -28,6 +28,10 @@ Abschalten: `powershell -ExecutionPolicy Bypass -File .\uninstall_autostart.ps1`
 | LeetCode | Mindestens eine akzeptierte Lösung seit 4 Uhr |
 | Lesen | 20-Minuten-Timer abgelaufen und ein Satz dazu (mindestens 20 Zeichen) |
 
+Für schlechte Tage gibt es einen Joker pro Kalenderwoche (`joker.per_week`): Du setzt ihn auf der Checkliste mit einer
+kurzen Begründung ein, und alles ist bis zum nächsten Tag um 4 Uhr frei. Die Woche beginnt montags um 4 Uhr, nicht
+genutzte Joker verfallen.
+
 Bei Anki zählen nur die Decks unter `Sprachen` und `Essential Spanish Vocabulary Top 5000`. `Archiv`, `Master` und
 `Poker` zählen nicht und blockieren auch nicht. Jede Karte zählt einmal, Antworten unter einer Sekunde gar nicht.
 Alle Werte stehen in `config.json`. Nach einer Änderung muss der Dienst neu starten.

@@ -15,6 +15,9 @@
     "minutes": 20,
     "min_note_chars": 20
   },
+  "joker": {
+    "per_week": 1
+  },
   "blocked_processes": [
     "LeagueClient.exe",
     "LeagueClientUx.exe",

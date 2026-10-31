@@ -9,6 +9,11 @@ from . import checks
 
 LEETCODE_TTL_SECONDS = 120
 LEETCODE_MIN_REFRESH_SECONDS = 5
+JOKER_MIN_REASON_CHARS = 3
+
+
+def _calendar_week(day):
+    return dt.date.fromisoformat(day).isocalendar()[:2]
 
 
 class LockService:
@@ -46,7 +51,7 @@ class LockService:
         """Today's record; starting a new day resets everything."""
         day = checks.logical_date(self._now(), self.config["day_rollover_hour"]).isoformat()
         if self.state.get("day") != day:
-            self.state = {"day": day, "done": {}, "reading": {}}
+            self.state = {"day": day, "done": {}, "reading": {}, "jokers": self.state.get("jokers", [])}
             self.anki_cache = (None, None)
             self.leetcode_cache = None
             self.leetcode_checked_at = 0
@@ -118,6 +123,18 @@ class LockService:
                 "state": "running" if remaining else "note",
                 "detail": "Timer läuft" if remaining else "Was hast du gelesen?"}
 
+    def _joker_status(self, today):
+        allowed = self.config["joker"]["per_week"]
+        week = _calendar_week(today["day"])
+        used = [j for j in today.get("jokers", []) if _calendar_week(j["day"]) == week]
+        current = next((j for j in used if j["day"] == today["day"]), None)
+        return {
+            "active": current is not None,
+            "reason": current["reason"] if current else None,
+            "left": max(0, allowed - len(used)),
+            "per_week": allowed,
+        }
+
     def status(self, refresh=False, network=True):
         if network:
             self._refresh_leetcode(refresh)
@@ -127,11 +144,31 @@ class LockService:
             leetcode = self._leetcode_status(today)
             reading = self._reading_status(today)
             items = {"anki": anki, "leetcode": leetcode, "reading": reading}
+            joker = self._joker_status(today)
             return {
                 "day": today["day"],
-                "unlocked": all(item["done"] for item in items.values()),
+                "unlocked": joker["active"] or all(item["done"] for item in items.values()),
                 "checks": items,
+                "joker": joker,
             }
+
+    def use_joker(self, reason):
+        reason = " ".join((reason or "").split())
+        with self.lock:
+            status = self.status(network=False)
+            joker = status["joker"]
+            if joker["active"]:
+                return joker
+            if status["unlocked"]:
+                raise ValueError("Heute ist schon alles erledigt")
+            if joker["left"] == 0:
+                raise ValueError("Der Joker für diese Woche ist schon verbraucht")
+            if len(reason) < JOKER_MIN_REASON_CHARS:
+                raise ValueError("Schreib bitte kurz dazu, warum du den Joker brauchst")
+            today = self._today()
+            today.setdefault("jokers", []).append({"day": today["day"], "reason": reason})
+            self._save_state()
+            return self._joker_status(today)
 
     def start_reading(self):
         with self.lock:

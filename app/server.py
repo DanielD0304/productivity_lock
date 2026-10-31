@@ -100,6 +100,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, service.start_reading())
             elif self.path == "/reading/finish":
                 self._send_json(200, service.finish_reading(json.loads(raw or b"{}").get("note")))
+            elif self.path == "/joker":
+                self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:
                 self._send_json(404, {"error": "Nicht gefunden"})
         except ValueError as error:
