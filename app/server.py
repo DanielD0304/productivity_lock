@@ -1,6 +1,7 @@
 """Local HTTP API for the browser extension, plus the lock page itself."""
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -9,6 +10,7 @@ BASE_URL = f"http://127.0.0.1:{PORT}"
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 SAME_ORIGINS = {f"http://{host}" for host in ALLOWED_HOSTS}
 MAX_BODY_BYTES = 10_000
+TASK_ROUTE = re.compile(r"^/tasks/([a-z0-9_-]+)/(start|finish)$")
 STATIC_FILES = {
     "/": ("locked.html", "text/html; charset=utf-8"),
     "/locked.js": ("locked.js", "text/javascript; charset=utf-8"),
@@ -95,11 +97,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         raw = self.rfile.read(length)
         service = self.server.service
+        task_route = TASK_ROUTE.match(self.path)
         try:
-            if self.path == "/reading/start":
-                self._send_json(200, service.start_reading())
-            elif self.path == "/reading/finish":
-                self._send_json(200, service.finish_reading(json.loads(raw or b"{}").get("note")))
+            if task_route and task_route[2] == "start":
+                self._send_json(200, service.start_task(task_route[1]))
+            elif task_route:
+                self._send_json(200, service.finish_task(task_route[1], json.loads(raw or b"{}").get("note")))
             elif self.path == "/joker":
                 self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:

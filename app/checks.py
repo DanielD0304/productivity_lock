@@ -137,6 +137,23 @@ def parse_leetcode(payload, start):
     return {"done": False, "detail": "Heute noch keine akzeptierte Lösung", "error": None}
 
 
+def parse_github(events, start):
+    for event in events:
+        created = dt.datetime.fromisoformat(event["created_at"].replace("Z", "+00:00"))
+        if event["type"] == "PushEvent" and created.timestamp() >= start.timestamp():
+            return {"done": True, "detail": f"Push in {event['repo']['name']}", "error": None}
+    return {"done": False, "detail": "Heute noch kein öffentlicher Push", "error": None}
+
+
+def check_github(username, start):
+    request = urllib.request.Request(
+        f"https://api.github.com/users/{username}/events/public?per_page=100",
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "productivity-lock"},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return parse_github(json.load(response), start)
+
+
 def check_leetcode(username, start):
     body = {"query": LEETCODE_QUERY, "variables": {"username": username, "limit": 20}}
     request = urllib.request.Request(

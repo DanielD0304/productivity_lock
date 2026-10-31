@@ -9,6 +9,7 @@ import time
 from app.enforcer import Enforcer, run_loop
 from app.server import BASE_URL, LockServer
 from app.service import LockService
+from app.tray import run_tray
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
@@ -38,9 +39,19 @@ def main():
         args=(service, enforcer, BASE_URL + "/", args.dry_run, time.monotonic),
         daemon=True,
     ).start()
+    if not args.dry_run:
+        threading.Thread(
+            target=run_tray,
+            args=(service, BASE_URL + "/", config.get("reminders", [])),
+            daemon=True,
+        ).start()
     logging.info("Gestartet%s", " (Testlauf)" if args.dry_run else "")
     server.serve_forever()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        logging.exception("Start fehlgeschlagen")
+        raise

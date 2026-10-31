@@ -1,19 +1,55 @@
-"""Daily state: combines the checks, runs the reading timer, remembers what is done."""
+"""Daily state: combines the tasks, runs the timers, remembers what is done."""
 import datetime as dt
 import json
 import os
+import re
 import threading
 import time
 
-from . import checks
+from . import checks, history
 
 LEETCODE_TTL_SECONDS = 120
-LEETCODE_MIN_REFRESH_SECONDS = 5
+GITHUB_TTL_SECONDS = 300
+REMOTE_MIN_REFRESH_SECONDS = 5
 JOKER_MIN_REASON_CHARS = 3
+TASK_ID = re.compile(r"^[a-z0-9_-]+$")
 
 
 def _calendar_week(day):
     return dt.date.fromisoformat(day).isocalendar()[:2]
+
+
+def _custom_task(custom):
+    base = {"id": custom["id"], "title": custom["title"]}
+    kind = custom["type"]
+    if kind == "github":
+        return {**base, "kind": "remote", "username": custom["username"], "ttl": GITHUB_TTL_SECONDS}
+    if kind not in ("timer", "check"):
+        raise ValueError(f"Unbekannter Aufgabentyp: {kind}")
+    return {
+        **base,
+        "kind": "timer",
+        "minutes": custom["minutes"] if kind == "timer" else 0,
+        "min_note_chars": custom.get("min_note_chars", 3),
+        "prompt": custom.get("prompt", "Was hast du gemacht?"),
+    }
+
+
+def build_tasks(config):
+    reading = config["reading"]
+    tasks = [
+        {"id": "anki", "title": "Anki", "kind": "anki",
+         "hint": "Auf dem Handy gelernt? Synchronisiere Anki einmal am PC."},
+        {"id": "leetcode", "title": "LeetCode", "kind": "remote", "ttl": LEETCODE_TTL_SECONDS,
+         "link": "https://leetcode.com/problemset/", "link_text": "Aufgabe aussuchen"},
+        {"id": "reading", "title": "Lesen", "kind": "timer", "minutes": reading["minutes"],
+         "min_note_chars": reading["min_note_chars"], "prompt": "Was hast du gelesen?"},
+    ]
+    tasks += [_custom_task(custom) for custom in config.get("custom_tasks", [])]
+    ids = [task["id"] for task in tasks]
+    if len(ids) != len(set(ids)) or not all(TASK_ID.match(task_id) for task_id in ids):
+        raise ValueError("Aufgaben-IDs müssen eindeutig sein und dürfen nur a-z, 0-9, _ und - enthalten")
+    return tasks
 
 
 class LockService:
@@ -21,13 +57,14 @@ class LockService:
         self.config = config
         self.clock = clock
         self.state_path = os.path.join(data_dir, "state.json")
-        self.log_path = os.path.join(data_dir, "reading_log.jsonl")
+        self.log_path = os.path.join(data_dir, "notes_log.jsonl")
         self.anki_check = anki_check or self._read_anki
         self.leetcode_check = leetcode_check or checks.check_leetcode
+        self.tasks = build_tasks(config)
         self.lock = threading.RLock()
         self.anki_cache = (None, None)
-        self.leetcode_cache = None
-        self.leetcode_checked_at = 0
+        self.remote_cache = {}
+        self.remote_checked_at = {}
         os.makedirs(data_dir, exist_ok=True)
         self.state = self._load_state()
 
@@ -48,13 +85,19 @@ class LockService:
         os.replace(temp, self.state_path)
 
     def _today(self):
-        """Today's record; starting a new day resets everything."""
+        """Today's record; starting a new day resets everything but the long-term records."""
         day = checks.logical_date(self._now(), self.config["day_rollover_hour"]).isoformat()
         if self.state.get("day") != day:
-            self.state = {"day": day, "done": {}, "reading": {}, "jokers": self.state.get("jokers", [])}
+            self.state = {
+                "day": day,
+                "done": {},
+                "timers": {},
+                "jokers": self.state.get("jokers", []),
+                "history": self.state.get("history", {}),
+            }
             self.anki_cache = (None, None)
-            self.leetcode_cache = None
-            self.leetcode_checked_at = 0
+            self.remote_cache = {}
+            self.remote_checked_at = {}
             self._save_state()
         return self.state
 
@@ -81,47 +124,69 @@ class LockService:
             self._save_state()
         return result
 
-    def _refresh_leetcode(self, refresh):
+    def _run_remote(self, task, start):
+        if task["id"] == "leetcode":
+            return self.leetcode_check(self.config["leetcode"]["username"], start)
+        return checks.check_github(task["username"], start)
+
+    def _refresh_remote(self, task, refresh):
         # Runs outside the state lock so a slow network never stalls the enforcer.
+        task_id = task["id"]
         with self.lock:
             today = self._today()
-            if "leetcode" in today["done"]:
+            if task_id in today["done"]:
                 return
-            age = self.clock() - self.leetcode_checked_at
+            age = self.clock() - self.remote_checked_at.get(task_id, 0)
             start = checks.day_start(self._now(), self.config["day_rollover_hour"])
-        if age < (LEETCODE_MIN_REFRESH_SECONDS if refresh else LEETCODE_TTL_SECONDS):
+        if age < (REMOTE_MIN_REFRESH_SECONDS if refresh else task["ttl"]):
             return
-        self.leetcode_checked_at = self.clock()
+        self.remote_checked_at[task_id] = self.clock()
         try:
-            result = self.leetcode_check(self.config["leetcode"]["username"], start)
+            result = self._run_remote(task, start)
         except Exception as error:
-            result = {"done": False, "detail": "LeetCode nicht erreichbar", "error": str(error)}
+            result = {"done": False, "detail": f"{task['title']} nicht erreichbar", "error": str(error)}
         with self.lock:
-            self.leetcode_cache = result
+            self.remote_cache[task_id] = result
             today = self._today()
             if result["done"]:
-                today["done"]["leetcode"] = result["detail"]
+                today["done"][task_id] = result["detail"]
                 self._save_state()
 
-    def _leetcode_status(self, today):
-        if "leetcode" in today["done"]:
-            return {"done": True, "detail": today["done"]["leetcode"], "error": None}
-        return self.leetcode_cache or {"done": False, "detail": "Wird geprüft …", "error": None}
+    def _remote_status(self, task, today):
+        if task["id"] in today["done"]:
+            return {"done": True, "detail": today["done"][task["id"]], "error": None}
+        return self.remote_cache.get(task["id"]) or {"done": False, "detail": "Wird geprüft …", "error": None}
 
-    def _reading_status(self, today):
-        minutes = self.config["reading"]["minutes"]
-        reading = today["reading"]
-        if reading.get("note"):
-            return {"done": True, "detail": reading["note"], "error": None,
-                    "state": "done", "remaining_seconds": 0, "minutes": minutes}
-        started = reading.get("started_at")
-        if started is None:
-            return {"done": False, "detail": f"{minutes} Minuten lesen, dann ein Satz dazu", "error": None,
-                    "state": "idle", "remaining_seconds": minutes * 60, "minutes": minutes}
-        remaining = max(0, round(started + minutes * 60 - self.clock()))
-        return {"done": False, "error": None, "minutes": minutes, "remaining_seconds": remaining,
+    def _timer_status(self, task, today):
+        minutes = task["minutes"]
+        timer = today.setdefault("timers", {}).get(task["id"], {})
+        base = {"error": None, "minutes": minutes, "prompt": task["prompt"]}
+        if timer.get("note"):
+            return {**base, "done": True, "detail": timer["note"], "state": "done", "remaining_seconds": 0}
+        started = timer.get("started_at")
+        if minutes and started is None:
+            return {**base, "done": False, "detail": f"{minutes} Minuten, dann ein Satz dazu",
+                    "state": "idle", "remaining_seconds": minutes * 60}
+        remaining = max(0, round(started + minutes * 60 - self.clock())) if minutes else 0
+        return {**base, "done": False, "remaining_seconds": remaining,
                 "state": "running" if remaining else "note",
-                "detail": "Timer läuft" if remaining else "Was hast du gelesen?"}
+                "detail": "Timer läuft" if remaining else task["prompt"]}
+
+    def _task_status(self, task, today):
+        if task["kind"] == "anki":
+            result = self._anki_status(today)
+        elif task["kind"] == "remote":
+            result = self._remote_status(task, today)
+        else:
+            result = self._timer_status(task, today)
+        return {
+            **result,
+            "title": task["title"],
+            "kind": task["kind"],
+            "hint": task.get("hint"),
+            "link": task.get("link"),
+            "link_text": task.get("link_text"),
+        }
 
     def _joker_status(self, today):
         allowed = self.config["joker"]["per_week"]
@@ -135,21 +200,38 @@ class LockService:
             "per_week": allowed,
         }
 
+    def _record_history(self, today, items, joker):
+        finished = sum(item["done"] for item in items.values())
+        if finished == len(items):
+            result = "done"
+        elif joker["active"]:
+            result = "joker"
+        elif finished:
+            result = "partial"
+        else:
+            return
+        entry = {"result": result, "done": finished, "total": len(items)}
+        days = today.setdefault("history", {})
+        if days.get(today["day"]) != entry:
+            days[today["day"]] = entry
+            self._save_state()
+
     def status(self, refresh=False, network=True):
         if network:
-            self._refresh_leetcode(refresh)
+            for task in self.tasks:
+                if task["kind"] == "remote":
+                    self._refresh_remote(task, refresh)
         with self.lock:
             today = self._today()
-            anki = self._anki_status(today)
-            leetcode = self._leetcode_status(today)
-            reading = self._reading_status(today)
-            items = {"anki": anki, "leetcode": leetcode, "reading": reading}
+            items = {task["id"]: self._task_status(task, today) for task in self.tasks}
             joker = self._joker_status(today)
+            self._record_history(today, items, joker)
             return {
                 "day": today["day"],
                 "unlocked": joker["active"] or all(item["done"] for item in items.values()),
                 "checks": items,
                 "joker": joker,
+                "history": history.summarize(today.get("history", {}), today["day"]),
             }
 
     def use_joker(self, reason):
@@ -170,27 +252,36 @@ class LockService:
             self._save_state()
             return self._joker_status(today)
 
-    def start_reading(self):
+    def _timer_task(self, task_id):
+        for task in self.tasks:
+            if task["id"] == task_id and task["kind"] == "timer":
+                return task
+        raise ValueError("Unbekannte Aufgabe")
+
+    def start_task(self, task_id):
+        task = self._timer_task(task_id)
         with self.lock:
             today = self._today()
-            today["reading"].setdefault("started_at", self.clock())
+            today.setdefault("timers", {}).setdefault(task_id, {}).setdefault("started_at", self.clock())
             self._save_state()
-            return self._reading_status(today)
+            return self._timer_status(task, today)
 
-    def finish_reading(self, note):
+    def finish_task(self, task_id, note):
+        task = self._timer_task(task_id)
         note = " ".join((note or "").split())
         with self.lock:
             today = self._today()
-            state = self._reading_status(today)["state"]
+            state = self._timer_status(task, today)["state"]
             if state == "done":
-                return self._reading_status(today)
+                return self._timer_status(task, today)
             if state != "note":
                 raise ValueError("Der Timer ist noch nicht abgelaufen")
-            required = self.config["reading"]["min_note_chars"]
+            required = task["min_note_chars"]
             if len(note) < required:
                 raise ValueError(f"Schreib bitte mindestens {required} Zeichen dazu")
-            today["reading"]["note"] = note
+            today["timers"].setdefault(task_id, {})["note"] = note
             self._save_state()
+            entry = {"day": today["day"], "task": task_id, "note": note}
             with open(self.log_path, "a", encoding="utf-8") as file:
-                file.write(json.dumps({"day": today["day"], "note": note}, ensure_ascii=False) + "\n")
-            return self._reading_status(today)
+                file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            return self._timer_status(task, today)

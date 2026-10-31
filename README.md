@@ -1,14 +1,16 @@
 # Productivity Lock
 
-Sperrt YouTube, Netflix und League of Legends, bis für heute Anki, LeetCode und Lesen erledigt sind.
+Sperrt YouTube, Netflix, Instagram und League of Legends, bis für heute Anki, LeetCode und Lesen erledigt sind.
 Der Tag beginnt wie in Anki um 4 Uhr. Erledigtes bleibt bis dahin erledigt. Die Checkliste liegt unter
 <http://127.0.0.1:47615/>.
 
 ## Einrichtung
 
-1. Dienst starten und in den Autostart legen. **Ein offener League-Client wird dabei sofort geschlossen.**
+1. Abhängigkeiten für das Tray-Symbol installieren, den Dienst starten und in den Autostart legen.
+   **Ist etwas gesperrt, wird ein offener League-Client dabei sofort geschlossen.**
 
    ```powershell
+   python -m pip install -r requirements.txt
    powershell -ExecutionPolicy Bypass -File .\install_autostart.ps1
    ```
 
@@ -38,6 +40,32 @@ Alle Werte stehen in `config.json`. Nach einer Änderung muss der Dienst neu sta
 
 Karten, die du am Handy lernst, zählen erst, nachdem Anki am PC synchronisiert hat. Der Check liest eine Kopie der
 Sammlung und braucht kein AnkiConnect.
+
+## Eigene Aufgaben
+
+Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
+
+```json
+"custom_tasks": [
+  { "id": "sport", "title": "Sport", "type": "check", "prompt": "Was hast du gemacht?" },
+  { "id": "studium", "title": "Studium", "type": "timer", "minutes": 45, "min_note_chars": 20 },
+  { "id": "code", "title": "GitHub", "type": "github", "username": "DanielD0304" }
+]
+```
+
+- `check`: nur eine kurze Notiz, ohne Timer.
+- `timer`: Timer mit eigener Dauer und danach eine Notiz. Die Notizen stehen in `data/notes_log.jsonl`.
+- `github`: mindestens ein Push seit 4 Uhr. Das sieht nur Pushes in **öffentliche** Repositories.
+
+## Verlauf und Tray-Symbol
+
+Die Checkliste zeigt deine Serie, den Rekord, die Wochenbilanz und einen Kalender. Nur komplett geschaffte Tage zählen
+für die Serie. Ein Joker-Tag zählt nicht mit, unterbricht sie aber auch nicht. Der Verlauf beginnt mit dem ersten Tag,
+an dem du etwas erledigt hast.
+
+Das Symbol neben der Uhr zeigt, wie viele Aufgaben erledigt sind: rot gesperrt, grün frei, `J` bei aktivem Joker. Ein
+Klick öffnet die Checkliste. Zu den Zeiten in `reminders` erinnert es dich an alles, was noch offen ist. Die Zeiten
+stehen im Format `HH:MM`.
 
 ## Sprachen lernen mit diesem Ziel
 

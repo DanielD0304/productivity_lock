@@ -15,10 +15,10 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import checks
+from app import checks, history, tray
 from app.enforcer import Enforcer, kill_process, run_loop, running_processes
 from app.server import LockServer
-from app.service import LockService
+from app.service import LockService, build_tasks
 
 ANKI = {
     "profile": "x",
@@ -220,7 +220,7 @@ class Clock:
         self.value += seconds
 
 
-class ServiceTest(unittest.TestCase):
+class ServiceBase(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
@@ -241,10 +241,12 @@ class ServiceTest(unittest.TestCase):
         return self.leetcode
 
     def read_fully(self):
-        self.service.start_reading()
+        self.service.start_task("reading")
         self.clock.advance(20 * 60)
-        self.service.finish_reading("Kapitel drei über Graphen gelesen.")
+        self.service.finish_task("reading", "Kapitel drei über Graphen gelesen.")
 
+
+class ServiceTest(ServiceBase):
     def test_all_three_unlock(self):
         self.assertFalse(self.service.status()["unlocked"])
         self.anki = {"done": True, "detail": "ok", "error": None}
@@ -258,32 +260,32 @@ class ServiceTest(unittest.TestCase):
 
     def test_timer_must_run_out(self):
         with self.assertRaisesRegex(ValueError, "Timer"):
-            self.service.finish_reading("Ein viel zu früher langer Satz zum Buch.")
-        self.service.start_reading()
+            self.service.finish_task("reading","Ein viel zu früher langer Satz zum Buch.")
+        self.service.start_task("reading")
         self.clock.advance(19 * 60)
         with self.assertRaisesRegex(ValueError, "Timer"):
-            self.service.finish_reading("Ein viel zu früher langer Satz zum Buch.")
+            self.service.finish_task("reading","Ein viel zu früher langer Satz zum Buch.")
 
     def test_restart_does_not_reset_timer(self):
-        self.service.start_reading()
+        self.service.start_task("reading")
         self.clock.advance(600)
-        self.assertEqual(self.service.start_reading()["remaining_seconds"], 600)
+        self.assertEqual(self.service.start_task("reading")["remaining_seconds"], 600)
 
     def test_timer_survives_restart_of_service(self):
-        self.service.start_reading()
+        self.service.start_task("reading")
         self.clock.advance(600)
         self.assertEqual(self.make_service().status()["checks"]["reading"]["remaining_seconds"], 600)
 
     def test_note_must_be_real(self):
-        self.service.start_reading()
+        self.service.start_task("reading")
         self.clock.advance(20 * 60)
         with self.assertRaisesRegex(ValueError, "20 Zeichen"):
-            self.service.finish_reading("   kurz      ")
+            self.service.finish_task("reading","   kurz      ")
         self.assertFalse(self.service.status()["checks"]["reading"]["done"])
 
     def test_note_is_logged(self):
         self.read_fully()
-        with open(os.path.join(self.dir, "reading_log.jsonl"), encoding="utf-8") as file:
+        with open(os.path.join(self.dir, "notes_log.jsonl"), encoding="utf-8") as file:
             self.assertEqual(json.loads(file.readline())["note"], "Kapitel drei über Graphen gelesen.")
 
     def test_done_stays_done_when_anki_later_fails(self):
@@ -336,7 +338,217 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(self.leetcode_calls, 0)
 
 
-class JokerTest(ServiceTest):
+class HistoryRulesTest(unittest.TestCase):
+    TODAY = "2026-10-31"  # a Saturday
+
+    @staticmethod
+    def days(**results):
+        return {f"2026-10-{key[1:]}": {"result": value} for key, value in results.items()}
+
+    def summary(self, **results):
+        return history.summarize(self.days(**results), self.TODAY)
+
+    def test_empty(self):
+        self.assertEqual(history.summarize({}, self.TODAY)["streak"], 0)
+        self.assertEqual(history.summarize({}, self.TODAY)["best"], 0)
+
+    def test_open_today_does_not_break_streak(self):
+        self.assertEqual(self.summary(d29="done", d30="done")["streak"], 2)
+
+    def test_finished_today_counts(self):
+        self.assertEqual(self.summary(d30="done", d31="done")["streak"], 2)
+
+    def test_missing_day_breaks_streak(self):
+        self.assertEqual(self.summary(d28="done", d30="done")["streak"], 1)
+
+    def test_partial_day_breaks_streak(self):
+        self.assertEqual(self.summary(d28="done", d29="partial", d30="done")["streak"], 1)
+
+    def test_joker_bridges_but_does_not_count(self):
+        self.assertEqual(self.summary(d28="done", d29="joker", d30="done")["streak"], 2)
+        self.assertEqual(self.summary(d30="done", d31="joker")["streak"], 1)
+
+    def test_best_survives_a_broken_streak(self):
+        summary = self.summary(d20="done", d21="done", d22="joker", d23="done", d29="done")
+        self.assertEqual(summary["best"], 3)
+        self.assertEqual(summary["streak"], 0)
+
+    def test_week_counts_only_this_week_and_since_tracking_began(self):
+        week = self.summary(d25="done", d28="done", d29="joker", d31="done")["week"]
+        self.assertEqual(week, {"done": 2, "joker": 1, "missed": 3})
+
+    def test_days_before_tracking_are_not_missed(self):
+        self.assertEqual(self.summary(d31="partial")["week"], {"done": 0, "joker": 0, "missed": 0})
+
+
+class HistoryRecordingTest(ServiceBase):
+    def test_untouched_day_has_no_entry(self):
+        self.assertEqual(self.service.status()["history"]["days"], {})
+
+    def test_progress_then_completion(self):
+        self.anki = {"done": True, "detail": "ok", "error": None}
+        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "partial"})
+        self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.read_fully()
+        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "done"})
+
+    def test_joker_is_recorded_and_finishing_upgrades_it(self):
+        self.service.use_joker("krank")
+        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "joker"})
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.read_fully()
+        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "done"})
+
+    def test_history_survives_new_day_and_restart(self):
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.read_fully()
+        self.service.status()
+        self.clock.value = dt.datetime(2026, 11, 1, 12, 0).timestamp()
+        status = self.make_service().status()
+        self.assertEqual(status["history"]["days"]["2026-10-31"], "done")
+        self.assertEqual(status["history"]["streak"], 1)
+
+
+class CustomTaskTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.config = {**CONFIG, "custom_tasks": [
+            {"id": "sport", "title": "Sport", "type": "check"},
+            {"id": "studium", "title": "Studium", "type": "timer", "minutes": 45, "min_note_chars": 10},
+        ]}
+        self.service = LockService(self.config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+
+    def test_custom_tasks_block_until_finished(self):
+        self.read_fully()
+        status = self.service.status()
+        self.assertEqual(list(status["checks"]), ["anki", "leetcode", "reading", "sport", "studium"])
+        self.assertFalse(status["unlocked"])
+        self.service.finish_task("sport", "5 km gelaufen")
+        self.service.start_task("studium")
+        self.clock.advance(45 * 60)
+        self.service.finish_task("studium", "Serie 3 gerechnet")
+        self.assertTrue(self.service.status()["unlocked"])
+
+    def test_check_needs_no_timer(self):
+        self.assertEqual(self.service.status()["checks"]["sport"]["state"], "note")
+
+    def test_timer_uses_its_own_minutes(self):
+        self.service.start_task("studium")
+        self.assertEqual(self.service.status()["checks"]["studium"]["remaining_seconds"], 45 * 60)
+
+    def test_unknown_or_non_timer_task_is_refused(self):
+        for task_id in ("nix", "anki"):
+            with self.assertRaisesRegex(ValueError, "Unbekannte"):
+                self.service.start_task(task_id)
+
+    def test_invalid_definitions_are_refused(self):
+        bad_lists = [
+            [{"id": "anki", "title": "x", "type": "check"}],
+            [{"id": "Mit Leerzeichen", "title": "x", "type": "check"}],
+            [{"id": "x", "title": "x", "type": "gibtsnicht"}],
+        ]
+        for tasks in bad_lists:
+            with self.assertRaises(ValueError):
+                build_tasks({**CONFIG, "custom_tasks": tasks})
+
+    def test_github_task_uses_its_own_check(self):
+        config = {**CONFIG, "custom_tasks": [{"id": "code", "title": "Code", "type": "github", "username": "me"}]}
+        service = LockService(config, self.dir, clock=self.clock,
+                              anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+        pushed = {"done": True, "detail": "Push in me/x", "error": None}
+        with mock.patch("app.checks.check_github", return_value=pushed) as check:
+            status = service.status()
+        check.assert_called_once()
+        self.assertEqual(check.call_args[0][0], "me")
+        self.assertTrue(status["checks"]["code"]["done"])
+
+
+class GitHubParseTest(unittest.TestCase):
+    start = dt.datetime(2026, 10, 31, 4, 0)
+
+    @staticmethod
+    def event(kind, moment):
+        created = moment.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"type": kind, "created_at": created, "repo": {"name": "me/x"}}
+
+    def test_push_today_counts(self):
+        result = checks.parse_github([self.event("PushEvent", dt.datetime(2026, 10, 31, 4, 0))], self.start)
+        self.assertTrue(result["done"])
+
+    def test_old_push_and_other_events_do_not_count(self):
+        events = [self.event("PushEvent", dt.datetime(2026, 10, 31, 3, 59)),
+                  self.event("WatchEvent", dt.datetime(2026, 10, 31, 12, 0))]
+        self.assertFalse(checks.parse_github(events, self.start)["done"])
+
+
+class TrayTest(unittest.TestCase):
+    @staticmethod
+    def status(anki=True, reading=False, joker=False):
+        return {
+            "day": "2026-10-31",
+            "unlocked": joker or (anki and reading),
+            "checks": {"anki": {"title": "Anki", "done": anki}, "reading": {"title": "Lesen", "done": reading}},
+            "joker": {"active": joker},
+            "history": {"streak": 4},
+        }
+
+    def test_texts(self):
+        self.assertEqual(tray.open_tasks(self.status()), ["Lesen"])
+        self.assertEqual(tray.tooltip(self.status()), "Productivity Lock: 1 von 2 erledigt · Serie 4")
+        self.assertEqual(tray.icon_label(self.status()), "1")
+        self.assertEqual(tray.icon_label(self.status(joker=True)), "J")
+        self.assertIn("Joker aktiv", tray.tooltip(self.status(joker=True)))
+
+    def test_icon_can_be_drawn(self):
+        self.assertEqual(tray.draw_icon(self.status()).size, (tray.ICON_SIZE, tray.ICON_SIZE))
+
+    def test_reminder_fires_once_per_time(self):
+        sent = set()
+        times = ["19:00", "21:30"]
+        self.assertFalse(tray.reminder_due(dt.datetime(2026, 10, 31, 18, 59), times, sent))
+        self.assertTrue(tray.reminder_due(dt.datetime(2026, 10, 31, 19, 0), times, sent))
+        self.assertFalse(tray.reminder_due(dt.datetime(2026, 10, 31, 20, 0), times, sent))
+        self.assertTrue(tray.reminder_due(dt.datetime(2026, 10, 31, 21, 30), times, sent))
+
+    def test_late_start_sends_a_single_reminder(self):
+        sent = set()
+        self.assertTrue(tray.reminder_due(dt.datetime(2026, 10, 31, 22, 0), ["19:00", "21:30"], sent))
+        self.assertFalse(tray.reminder_due(dt.datetime(2026, 10, 31, 22, 0), ["19:00", "21:30"], sent))
+
+    def test_no_reminder_when_unlocked(self):
+        icon = mock.Mock()
+        with mock.patch("app.tray.dt") as fake_dt:
+            fake_dt.datetime.now.return_value = dt.datetime(2026, 10, 31, 20, 0)
+            tray._remind_if_due(icon, self.status(reading=True), ["19:00"], {})
+            icon.notify.assert_not_called()
+            tray._remind_if_due(icon, self.status(), ["19:00"], {})
+            icon.notify.assert_called_once()
+        self.assertIn("Lesen", icon.notify.call_args[0][0])
+
+
+class ExtensionFilesTest(unittest.TestCase):
+    def test_every_blocked_site_is_in_rules_and_permissions(self):
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
+        with open(os.path.join(root, "rules.json"), encoding="utf-8") as file:
+            rules = json.load(file)
+        with open(os.path.join(root, "manifest.json"), encoding="utf-8") as file:
+            permissions = json.load(file)["host_permissions"]
+        with open(os.path.join(root, "background.js"), encoding="utf-8") as file:
+            background = file.read()
+        for domain in ("youtube.com", "netflix.com", "instagram.com"):
+            for rule in rules:
+                self.assertIn(domain, rule["condition"]["requestDomains"])
+            self.assertIn(f"*://*.{domain}/*", permissions)
+            self.assertIn(f"*://*.{domain}/*", background)
+
+
+class JokerTest(ServiceBase):
     # NOW is Saturday, 2026-10-31.
     def at(self, *moment):
         self.clock.value = dt.datetime(*moment).timestamp()
@@ -520,7 +732,7 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
 
     def test_foreign_website_is_refused(self):
-        code, _, _ = self.request("/reading/start", method="POST", body={}, origin="https://evil.example")
+        code, _, _ = self.request("/tasks/reading/start", method="POST", body={}, origin="https://evil.example")
         self.assertEqual(code, 403)
         self.assertEqual(self.service.status()["checks"]["reading"]["state"], "idle")
 
@@ -539,12 +751,12 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.request("/status", host="evil.example:47615")[0], 403)
 
     def test_early_finish_returns_message(self):
-        code, body, _ = self.request("/reading/finish", method="POST", body={"note": "x"})
+        code, body, _ = self.request("/tasks/reading/finish", method="POST", body={"note": "x"})
         self.assertEqual(code, 400)
         self.assertIn("Timer", json.loads(body)["error"])
 
     def test_malformed_json_returns_400(self):
-        request = urllib.request.Request(f"http://127.0.0.1:{self.PORT}/reading/finish", method="POST", data=b"{nope")
+        request = urllib.request.Request(f"http://127.0.0.1:{self.PORT}/tasks/reading/finish", method="POST", data=b"{nope")
         request.add_header("Host", "127.0.0.1:47615")
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(request, timeout=5)

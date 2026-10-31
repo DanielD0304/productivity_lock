@@ -131,6 +131,47 @@ button.quiet {
 
 .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 
+.history { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.stats { margin-top: 4px; }
+#best, .week { color: var(--muted); font-size: 14px; }
+.month-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-weight: 600; }
+
+button.nav {
+  margin: 0;
+  width: 44px;
+  height: 36px;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
+button.nav:disabled { color: var(--line); cursor: default; }
+
+.calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.weekday { padding-bottom: 2px; text-align: center; color: var(--muted); font-size: 12px; }
+
+.day {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.day.done, .swatch.done { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.day.joker-day, .swatch.joker-day { border: 1px dashed var(--accent); color: var(--text); }
+.day.partial, .swatch.partial { background: var(--line); color: var(--text); }
+.day.today { outline: 2px solid var(--text); outline-offset: 1px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 12px; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; }
+
 .joker { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
 .joker button.quiet { display: block; margin-top: 4px; }
 #joker-form button { margin-right: 12px; }

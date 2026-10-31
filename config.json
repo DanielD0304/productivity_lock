@@ -18,6 +18,8 @@
   "joker": {
     "per_week": 1
   },
+  "custom_tasks": [],
+  "reminders": ["19:00", "21:30"],
   "blocked_processes": [
     "LeagueClient.exe",
     "LeagueClientUx.exe",

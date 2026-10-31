@@ -5,6 +5,7 @@ const BLOCKED_TABS = [
   "*://youtu.be/*",
   "*://*.youtube-nocookie.com/*",
   "*://*.netflix.com/*",
+  "*://*.instagram.com/*",
 ];
 
 // Stays locked when the service is unreachable, so stopping it opens nothing.

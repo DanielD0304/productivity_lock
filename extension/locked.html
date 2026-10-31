@@ -16,45 +16,33 @@
       <code>install_autostart.ps1</code> aus.
     </p>
 
-    <ul class="tasks">
-      <li class="task" id="anki">
-        <span class="mark" aria-hidden="true"></span>
-        <div>
-          <h2>Anki</h2>
-          <p class="detail"></p>
-          <p class="error" hidden></p>
-          <p class="hint">Auf dem Handy gelernt? Synchronisiere Anki einmal am PC.</p>
-        </div>
-      </li>
-      <li class="task" id="leetcode">
-        <span class="mark" aria-hidden="true"></span>
-        <div>
-          <h2>LeetCode</h2>
-          <p class="detail"></p>
-          <p class="error" hidden></p>
-          <a class="hint" href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">Aufgabe aussuchen</a>
-        </div>
-      </li>
-      <li class="task" id="reading">
+    <ul class="tasks" id="tasks"></ul>
+
+    <template id="task-template">
+      <li class="task">
         <span class="mark" aria-hidden="true"></span>
         <div class="grow">
-          <h2>Lesen</h2>
+          <h2 class="task-title"></h2>
           <p class="detail"></p>
-          <p class="timer" id="timer" hidden></p>
-          <button id="start" type="button" hidden>Timer starten</button>
-          <form id="note-form" hidden>
-            <label for="note">Was hast du gelesen?</label>
-            <textarea id="note" rows="2" maxlength="1000"></textarea>
-            <p class="error" id="note-error" hidden></p>
+          <p class="error check-error" hidden></p>
+          <p class="hint hint-text" hidden></p>
+          <a class="hint hint-link" target="_blank" rel="noreferrer" hidden></a>
+          <p class="timer" hidden></p>
+          <button class="start" type="button" hidden>Timer starten</button>
+          <form class="note-form" hidden>
+            <label class="note-label"></label>
+            <textarea class="note" rows="2" maxlength="1000"></textarea>
+            <p class="error note-error" hidden></p>
             <button type="submit">Abschließen</button>
           </form>
         </div>
       </li>
-    </ul>
+    </template>
 
     <div class="links" id="links" hidden>
       <a class="primary" href="https://www.youtube.com/">YouTube öffnen</a>
       <a class="primary" href="https://www.netflix.com/">Netflix öffnen</a>
+      <a class="primary" href="https://www.instagram.com/">Instagram öffnen</a>
     </div>
 
     <button class="quiet" id="refresh" type="button">Jetzt prüfen</button>
@@ -69,6 +57,23 @@
         <button type="submit">Heute freigeben</button>
         <button class="quiet" id="joker-cancel" type="button">Abbrechen</button>
       </form>
+    </section>
+
+    <section class="history" id="history" hidden>
+      <h2>Verlauf</h2>
+      <p class="stats"><strong id="streak"></strong> <span id="best"></span></p>
+      <p class="week" id="week"></p>
+      <div class="month-nav">
+        <button class="nav" id="month-prev" type="button" aria-label="Voriger Monat">‹</button>
+        <span id="month-label"></span>
+        <button class="nav" id="month-next" type="button" aria-label="Nächster Monat">›</button>
+      </div>
+      <div class="calendar" id="calendar"></div>
+      <ul class="legend">
+        <li><span class="swatch done"></span>Geschafft</li>
+        <li><span class="swatch joker-day"></span>Joker</li>
+        <li><span class="swatch partial"></span>Teilweise</li>
+      </ul>
     </section>
   </main>
   <script src="locked.js"></script>

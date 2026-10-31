@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Productivity Lock",
-  "version": "1.0.0",
-  "description": "Sperrt YouTube und Netflix, bis Anki, LeetCode und Lesen für heute erledigt sind.",
+  "version": "1.1.0",
+  "description": "Sperrt YouTube, Netflix und Instagram, bis die Aufgaben für heute erledigt sind.",
   "permissions": ["declarativeNetRequest", "alarms"],
   "host_permissions": [
     "http://127.0.0.1:47615/*",
     "*://*.youtube.com/*",
     "*://youtu.be/*",
     "*://*.youtube-nocookie.com/*",
-    "*://*.netflix.com/*"
+    "*://*.netflix.com/*",
+    "*://*.instagram.com/*"
   ],
   "background": {
     "service_worker": "background.js"
