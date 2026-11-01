@@ -26,7 +26,7 @@ Abschalten: `powershell -ExecutionPolicy Bypass -File .\uninstall_autostart.ps1`
 
 | Aufgabe | Bedingung |
 | --- | --- |
-| Anki | 10 neue Wörter und alle fälligen Wiederholungen, höchstens 100. Spätestens nach 30 Minuten gilt Anki als erledigt, wenn du mindestens eine Karte gelernt hast. |
+| Anki | 200 beantwortete Karten oder 30 Minuten Lernzeit, was zuerst erreicht ist |
 | LeetCode | Mindestens eine akzeptierte Lösung seit 4 Uhr |
 | Lesen | 20-Minuten-Timer abgelaufen und ein Satz dazu (mindestens 20 Zeichen) |
 
@@ -35,7 +35,7 @@ kurzen Begründung ein, und alles ist bis zum nächsten Tag um 4 Uhr frei. Die W
 genutzte Joker verfallen.
 
 Bei Anki zählen nur die Decks unter `Sprachen` und `Essential Spanish Vocabulary Top 5000`. `Archiv`, `Master` und
-`Poker` zählen nicht und blockieren auch nicht. Jede Karte zählt einmal, Antworten unter einer Sekunde gar nicht.
+`Poker` zählen nicht und blockieren auch nicht. Jede Antwort zählt, auch bei derselben Karte; Antworten unter einer Sekunde zählen nicht als Karte.
 Alle Werte stehen in `config.json`. Nach einer Änderung muss der Dienst neu starten.
 
 Karten, die du am Handy lernst, zählen erst, nachdem Anki am PC synchronisiert hat. Der Check liest eine Kopie der

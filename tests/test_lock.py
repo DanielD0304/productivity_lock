@@ -23,9 +23,8 @@ from app.service import LockService, build_tasks
 ANKI = {
     "profile": "x",
     "decks": ["Sprachen", "Spanisch"],
-    "new_cards": 10,
-    "review_cap": 100,
-    "max_minutes": 30,
+    "cards": 200,
+    "minutes": 30,
     "min_answer_ms": 1000,
 }
 CONFIG = {
@@ -37,7 +36,6 @@ CONFIG = {
 }
 NOW = dt.datetime(2026, 10, 31, 12, 0)
 CREATED = dt.datetime(2026, 10, 1, 4, 0)
-ANKI_TODAY = 30
 DECKS = {1: "Sprachen\x1fRussisch", 2: "Spanisch", 3: "Archiv\x1fAlt", 4: "Sprachenzentrum"}
 SCHEMA = """
 create table col (crt integer);
@@ -56,10 +54,10 @@ class AnkiFixture:
         self.next_card = 1
         self.next_log = int(NOW.timestamp() * 1000) - 3_000_000
 
-    def card(self, deck=1, queue=2, due=ANKI_TODAY + 5, odid=0, odue=0):
+    def card(self, deck=1, odid=0):
         card = self.next_card
         self.next_card += 1
-        self.db.execute("insert into cards values (?, ?, ?, ?, ?, ?)", (card, deck, odid, queue, due, odue))
+        self.db.execute("insert into cards values (?, ?, ?, 2, 0, 0)", (card, deck, odid))
         return card
 
     def log(self, card, when=None, ease=3, taken_ms=5000):
@@ -67,100 +65,69 @@ class AnkiFixture:
         entry = int(when.timestamp() * 1000) if when else self.next_log
         self.db.execute("insert into revlog values (?, ?, ?, ?)", (entry, card, ease, taken_ms))
 
-    def new_today(self, count, deck=1):
+    def answered_today(self, count, deck=1, taken_ms=1000):
         for _ in range(count):
-            self.log(self.card(deck))
-
-    def reviewed_today(self, count, deck=1):
-        for _ in range(count):
-            card = self.card(deck)
-            self.log(card, when=NOW - dt.timedelta(days=3))
-            self.log(card)
+            self.log(self.card(deck), taken_ms=taken_ms)
 
     def evaluate(self):
         return checks.evaluate_anki(self.db, ANKI, NOW, 4)
 
 
 class AnkiRuleTest(unittest.TestCase):
-    def test_nothing_learned_is_open_even_without_due_cards(self):
-        self.assertFalse(AnkiFixture().evaluate()["done"])
-
-    def test_open_while_new_cards_are_missing(self):
-        fixture = AnkiFixture()
-        fixture.card(queue=0)
-        fixture.new_today(9)
-        result = fixture.evaluate()
+    def test_nothing_learned_is_open(self):
+        result = AnkiFixture().evaluate()
         self.assertFalse(result["done"])
-        self.assertIn("9/10 neue", result["detail"])
+        self.assertEqual(result["detail"], "0/200 Karten oder 0/30 Min")
 
-    def test_ten_new_and_no_reviews_due_is_done(self):
+    def test_200_cards_are_enough(self):
         fixture = AnkiFixture()
-        fixture.card(queue=0)
-        fixture.new_today(10)
+        fixture.answered_today(199)
+        self.assertFalse(fixture.evaluate()["done"])
+        fixture.answered_today(1)
         self.assertTrue(fixture.evaluate()["done"])
 
-    def test_large_backlog_is_capped_at_review_limit(self):
+    def test_30_minutes_are_enough(self):
         fixture = AnkiFixture()
-        for _ in range(400):
-            fixture.card(due=ANKI_TODAY - 2)
-        fixture.new_today(10)
-        fixture.reviewed_today(99)
+        fixture.answered_today(29, taken_ms=60000)
         self.assertFalse(fixture.evaluate()["done"])
-        fixture.reviewed_today(1)
-        result = fixture.evaluate()
-        self.assertTrue(result["done"])
-        self.assertIn("100/100 Wiederholungen", result["detail"])
-
-    def test_time_cap_ends_the_day(self):
-        fixture = AnkiFixture()
-        for _ in range(50):
-            fixture.card(due=ANKI_TODAY)
-        for _ in range(31):
-            fixture.log(fixture.card(), taken_ms=60000)
-        fixture.card(queue=0)
+        fixture.answered_today(1, taken_ms=60000)
         self.assertTrue(fixture.evaluate()["done"])
 
-    def test_other_decks_neither_count_nor_block(self):
+    def test_other_decks_do_not_count(self):
         fixture = AnkiFixture()
-        for _ in range(100):
-            fixture.card(deck=3, due=ANKI_TODAY)
-        fixture.new_today(10, deck=3)
-        fixture.new_today(10, deck=4)
+        fixture.answered_today(200, deck=3)
+        fixture.answered_today(200, deck=4)
         self.assertFalse(fixture.evaluate()["done"])
-        fixture.new_today(10, deck=2)
+        fixture.answered_today(200, deck=2)
         self.assertTrue(fixture.evaluate()["done"])
 
-    def test_flicked_answers_do_not_count(self):
+    def test_flicked_answers_do_not_count_as_cards(self):
         fixture = AnkiFixture()
-        fixture.card(queue=0)
-        for _ in range(10):
-            fixture.log(fixture.card(), taken_ms=300)
-        self.assertFalse(fixture.evaluate()["done"])
+        fixture.answered_today(300, taken_ms=999)
+        self.assertIn("0/200 Karten", fixture.evaluate()["detail"])
 
-    def test_repeating_one_card_counts_once(self):
+    def test_every_answer_of_a_card_counts(self):
         fixture = AnkiFixture()
-        fixture.card(queue=0)
         card = fixture.card()
-        for _ in range(10):
+        for _ in range(3):
             fixture.log(card)
-        self.assertIn("1/10 neue", fixture.evaluate()["detail"])
+        self.assertIn("3/200 Karten", fixture.evaluate()["detail"])
 
     def test_reviews_before_rollover_belong_to_yesterday(self):
         fixture = AnkiFixture()
         fixture.log(fixture.card(), when=dt.datetime(2026, 10, 31, 3, 59))
         fixture.log(fixture.card(), when=dt.datetime(2026, 10, 31, 4, 1))
-        self.assertIn("1/10 neue", fixture.evaluate()["detail"])
+        self.assertIn("1/200 Karten", fixture.evaluate()["detail"])
 
     def test_filtered_deck_cards_count_for_their_home_deck(self):
         fixture = AnkiFixture()
-        fixture.card(deck=3, odid=1, queue=2, due=-100, odue=ANKI_TODAY)
-        fixture.new_today(1)
-        self.assertIn("1/10 neue Wörter · 0/1 Wiederholungen", fixture.evaluate()["detail"])
+        fixture.log(fixture.card(deck=3, odid=1))
+        self.assertIn("1/200 Karten", fixture.evaluate()["detail"])
 
     def test_manual_reschedules_are_ignored(self):
         fixture = AnkiFixture()
         fixture.log(fixture.card(), ease=0)
-        self.assertIn("0/10 neue", fixture.evaluate()["detail"])
+        self.assertIn("0/200 Karten", fixture.evaluate()["detail"])
 
     def test_copy_of_exclusively_locked_wal_database_is_readable(self):
         # Same pragmas Anki uses while a collection is open.
@@ -183,7 +150,7 @@ class AnkiRuleTest(unittest.TestCase):
                 finally:
                     other.close()
             result = checks.check_anki(path, ANKI, NOW, 4)
-            self.assertIn("1/10 neue", result["detail"])
+            self.assertIn("1/200 Karten", result["detail"])
         finally:
             db.close()
             shutil.rmtree(tmp, ignore_errors=True)

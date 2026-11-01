@@ -3,9 +3,8 @@
   "anki": {
     "profile": "User 1",
     "decks": ["Sprachen", "Essential Spanish Vocabulary Top 5000"],
-    "new_cards": 10,
-    "review_cap": 100,
-    "max_minutes": 30,
+    "cards": 200,
+    "minutes": 30,
     "min_answer_ms": 1000
   },
   "leetcode": {

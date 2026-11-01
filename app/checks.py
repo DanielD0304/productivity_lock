@@ -69,60 +69,33 @@ def _deck_matches(name, prefixes):
 
 
 def evaluate_anki(db, settings, now, rollover_hour):
-    created = dt.datetime.fromtimestamp(db.execute("select crt from col").fetchone()[0])
-    anki_today = (logical_date(now, rollover_hour) - logical_date(created, rollover_hour)).days
     start_ms = int(day_start(now, rollover_hour).timestamp() * 1000)
 
     decks = {
         deck_id: name.replace("\x1f", "::")
         for deck_id, name in db.execute("select id, name from decks")
     }
-    cards = set()
-    new_left = 0
-    due_left = 0
-    query = "select id, did, odid, queue, due, odue from cards"
-    for card, did, odid, queue, due, odue in db.execute(query):
-        if not _deck_matches(decks.get(odid or did, ""), settings["decks"]):
-            continue
-        cards.add(card)
-        if queue == 0:
-            new_left += 1
-        elif queue in (2, 3) and (odue if odid else due) <= anki_today:
-            due_left += 1
+    cards = {
+        card
+        for card, did, odid in db.execute("select id, did, odid from cards")
+        if _deck_matches(decks.get(odid or did, ""), settings["decks"])
+    }
 
-    seen_before_today = set()
-    new_today = set()
-    reviewed_today = set()
+    answers = 0
     spent_ms = 0
     # ease 0 marks manual reschedules, which are not learning.
-    query = "select id, cid, time from revlog where ease > 0 order by id"
-    for entry, card, taken_ms in db.execute(query):
-        if entry < start_ms:
-            seen_before_today.add(card)
-            continue
+    query = "select cid, time from revlog where ease > 0 and id >= ?"
+    for card, taken_ms in db.execute(query, (start_ms,)):
         if card not in cards:
             continue
         spent_ms += taken_ms
-        if taken_ms < settings["min_answer_ms"]:
-            continue
-        (reviewed_today if card in seen_before_today else new_today).add(card)
-    reviewed_today -= new_today
+        if taken_ms >= settings["min_answer_ms"]:
+            answers += 1
 
-    new_count = len(new_today)
-    review_count = len(reviewed_today)
     minutes = spent_ms / 60000
-    new_ok = new_count >= settings["new_cards"] or new_left == 0
-    reviews_ok = review_count >= settings["review_cap"] or due_left == 0
-    time_cap_ok = minutes >= settings["max_minutes"]
-    learned = new_count + review_count > 0
-    review_target = min(settings["review_cap"], review_count + due_left)
     return {
-        "done": learned and ((new_ok and reviews_ok) or time_cap_ok),
-        "detail": (
-            f"{new_count}/{settings['new_cards']} neue Wörter · "
-            f"{review_count}/{review_target} Wiederholungen · "
-            f"{minutes:.0f}/{settings['max_minutes']} Min"
-        ),
+        "done": answers >= settings["cards"] or minutes >= settings["minutes"],
+        "detail": f"{answers}/{settings['cards']} Karten oder {minutes:.0f}/{settings['minutes']} Min",
         "error": None,
     }
 
