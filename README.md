@@ -57,6 +57,26 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 - `timer`: Timer mit eigener Dauer und danach eine Notiz. Die Notizen stehen in `data/notes_log.jsonl`.
 - `github`: mindestens ein Push seit 4 Uhr. Das sieht nur Pushes in **öffentliche** Repositories.
 
+## Lernchat
+
+Dreimal pro Woche ein kurzer Chat mit Claude: Quiz zur nächsten Prüfung, ein Thema selbst erklären oder eine Sprache
+üben. Du startest ihn in Claude Code mit `/lernchat` im Projektordner. Der Skill sucht über deine
+Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan
+dran ist. Am Ende trägt er das Ergebnis mit `scripts/lernchat.py` in `data/lernchat.jsonl` ein.
+
+Einstellungen in `config.json` unter `lernchat`:
+
+| Wert | Bedeutung |
+| --- | --- |
+| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (3) |
+| `language_per_week` | Davon mindestens so viele in einer Sprache (1) |
+| `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
+
+Pro Tag zählt höchstens ein Chat. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur noch für
+das Wochenziel reichen, bei 3 pro Woche also ab Freitag. An allen Tagen davor steht sie auf „Heute frei“. Ist das
+Ziel erreicht, bleibt sie bis Montag 4 Uhr frei. Die Punktzahl bewertet Claude selbst. Wer sie hochschreibt, betrügt
+nur sich. Ohne `lernchat` in der Config gibt es die Aufgabe nicht.
+
 ## Verlauf und Tray-Symbol
 
 Die Checkliste zeigt deine Serie, den Rekord, die Wochenbilanz und einen Kalender. Nur komplett geschaffte Tage zählen

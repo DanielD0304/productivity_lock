@@ -6,8 +6,9 @@ import re
 import threading
 import time
 
-from . import checks, history
+from . import checks, history, lernchat
 
+LERNCHAT_HINT = "Öffne das Projekt in Claude Code und tippe /lernchat."
 LEETCODE_TTL_SECONDS = 120
 GITHUB_TTL_SECONDS = 300
 REMOTE_MIN_REFRESH_SECONDS = 5
@@ -45,6 +46,8 @@ def build_tasks(config):
         {"id": "reading", "title": "Lesen", "kind": "timer", "minutes": reading["minutes"],
          "min_note_chars": reading["min_note_chars"], "prompt": "Was hast du gelesen?"},
     ]
+    if config.get("lernchat"):
+        tasks.append({"id": "lernchat", "title": "Lernchat", "kind": "lernchat", "hint": LERNCHAT_HINT})
     tasks += [_custom_task(custom) for custom in config.get("custom_tasks", [])]
     ids = [task["id"] for task in tasks]
     if len(ids) != len(set(ids)) or not all(TASK_ID.match(task_id) for task_id in ids):
@@ -58,6 +61,7 @@ class LockService:
         self.clock = clock
         self.state_path = os.path.join(data_dir, "state.json")
         self.log_path = os.path.join(data_dir, "notes_log.jsonl")
+        self.lernchat_path = os.path.join(data_dir, "lernchat.jsonl")
         self.anki_check = anki_check or self._read_anki
         self.leetcode_check = leetcode_check or checks.check_leetcode
         self.tasks = build_tasks(config)
@@ -124,6 +128,16 @@ class LockService:
             self._save_state()
         return result
 
+    def _lernchat_status(self, today):
+        if "lernchat" in today["done"]:
+            return {"done": True, "detail": today["done"]["lernchat"], "error": None}
+        sessions = lernchat.read_sessions(self.lernchat_path, self.config["day_rollover_hour"])
+        result = lernchat.status(sessions, dt.date.fromisoformat(today["day"]), self.config["lernchat"])
+        if result["done"]:
+            today["done"]["lernchat"] = result["detail"]
+            self._save_state()
+        return {**result, "error": None}
+
     def _run_remote(self, task, start):
         if task["id"] == "leetcode":
             return self.leetcode_check(self.config["leetcode"]["username"], start)
@@ -177,6 +191,8 @@ class LockService:
             result = self._anki_status(today)
         elif task["kind"] == "remote":
             result = self._remote_status(task, today)
+        elif task["kind"] == "lernchat":
+            result = self._lernchat_status(today)
         else:
             result = self._timer_status(task, today)
         return {

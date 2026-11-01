@@ -15,7 +15,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import checks, history, tray
+from app import checks, history, lernchat, tray
 from app.enforcer import Enforcer, kill_process, run_loop, running_processes
 from app.server import LockServer
 from app.service import LockService, build_tasks
@@ -434,6 +434,112 @@ class CustomTaskTest(ServiceBase):
         check.assert_called_once()
         self.assertEqual(check.call_args[0][0], "me")
         self.assertTrue(status["checks"]["code"]["done"])
+
+
+class LernchatTest(ServiceBase):
+    CHAT = {"per_week": 3, "language_per_week": 1, "min_score": 0.7}
+
+    def setUp(self):
+        super().setUp()
+        self.config = {**CONFIG, "lernchat": self.CHAT}
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.restart()
+        self.read_fully()
+
+    def restart(self):
+        self.service = LockService(self.config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def chat(self, day, mode="quiz", score=0.8, hour=20):
+        moment = dt.datetime(2026, 10, day, hour)
+        entry = lernchat.log_entry(moment, "Mathe", mode, "Thema", score)
+        with open(self.service.lernchat_path, "a", encoding="utf-8") as file:
+            file.write(json.dumps(entry) + "\n")
+
+    def status(self):
+        return self.service.status(network=False)["checks"]["lernchat"]
+
+    def set_day(self, day):
+        self.clock.value = dt.datetime(2026, 10, day, 12).timestamp()
+
+    def test_early_in_the_week_the_chat_is_free(self):
+        self.set_day(26)  # Monday
+        self.assertTrue(self.status()["done"])
+        self.assertIn("frei", self.status()["detail"])
+
+    def test_saturday_without_chats_blocks(self):
+        self.set_day(31)
+        self.assertFalse(self.status()["done"])
+        self.assertFalse(self.service.status(network=False)["unlocked"])
+
+    def test_passed_chat_today_unlocks(self):
+        self.set_day(31)
+        self.chat(31, "sprache")
+        self.assertTrue(self.status()["done"])
+
+    def test_low_score_does_not_count(self):
+        self.set_day(31)
+        self.chat(31, score=0.5)
+        self.assertFalse(self.status()["done"])
+
+    def test_two_chats_on_one_day_count_once(self):
+        self.chat(26)
+        self.chat(26)
+        progress = lernchat.week_progress(
+            lernchat.read_sessions(self.service.lernchat_path, 4), dt.date(2026, 10, 27), self.CHAT)
+        self.assertEqual(progress["total"], 1)
+
+    def test_language_chat_is_required_even_after_three_chats(self):
+        for day in (26, 27, 28):
+            self.chat(day)
+        self.set_day(31)
+        self.assertTrue(self.status()["done"])  # Sunday is still left for it
+        self.clock.value = dt.datetime(2026, 11, 1, 12).timestamp()
+        self.service.state["done"] = {}
+        self.assertFalse(self.status()["done"])
+        self.assertIn("Sprache", self.status()["detail"])
+
+    def test_goal_reached_frees_the_rest_of_the_week(self):
+        self.chat(26)
+        self.chat(27)
+        self.chat(28, "sprache")
+        self.set_day(31)
+        self.assertTrue(self.status()["done"])
+        self.assertIn("Wochenziel", self.status()["detail"])
+
+    def test_new_week_starts_at_zero(self):
+        for day in (19, 20, 21):
+            self.chat(day, "sprache")
+        self.set_day(31)
+        self.assertFalse(self.status()["done"])
+
+    def test_chat_before_rollover_belongs_to_yesterday(self):
+        self.chat(31, hour=2)
+        progress = lernchat.week_progress(
+            lernchat.read_sessions(self.service.lernchat_path, 4), dt.date(2026, 10, 31), self.CHAT)
+        self.assertFalse(progress["today"])
+
+    def test_broken_lines_are_skipped(self):
+        with open(self.service.lernchat_path, "w", encoding="utf-8") as file:
+            file.write('kaputt\n{"at": "heute"}\n')
+        self.set_day(31)
+        self.assertFalse(self.status()["done"])
+
+    def test_done_stays_done_when_log_disappears(self):
+        self.set_day(31)
+        self.chat(31)
+        self.assertTrue(self.status()["done"])
+        os.remove(self.service.lernchat_path)
+        self.assertTrue(self.status()["done"])
+
+    def test_invalid_entries_are_refused(self):
+        with self.assertRaises(ValueError):
+            lernchat.log_entry(NOW, "Mathe", "raten", "x", 0.5)
+        with self.assertRaises(ValueError):
+            lernchat.log_entry(NOW, "Mathe", "quiz", "x", 1.5)
+
+    def test_task_is_absent_without_config(self):
+        self.assertNotIn("lernchat", [task["id"] for task in build_tasks(CONFIG)])
 
 
 class GitHubParseTest(unittest.TestCase):
