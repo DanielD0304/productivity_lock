@@ -25,6 +25,16 @@ function createRow(id) {
   const noteId = `note-${id}`;
   row.querySelector(".note").id = noteId;
   row.querySelector(".note-label").htmlFor = noteId;
+  row.querySelector(".action").addEventListener("click", async () => {
+    const error = row.querySelector(".action-error");
+    error.hidden = true;
+    try {
+      await post(row.querySelector(".action").dataset.path);
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    }
+  });
   row.querySelector(".start").addEventListener("click", async () => {
     await post(`/tasks/${id}/start`);
     await refresh();
@@ -65,6 +75,11 @@ function renderTask(id, check) {
   link.hidden = !check.link;
   link.textContent = check.link_text || "";
   if (check.link) link.href = check.link;
+
+  const action = row.querySelector(".action");
+  action.hidden = !check.action_path;
+  action.textContent = check.action_text || "";
+  action.dataset.path = check.action_path || "";
 
   row.querySelector(".start").hidden = check.state !== "idle";
   row.querySelector(".note-form").hidden = check.state !== "note";

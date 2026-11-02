@@ -23,9 +23,10 @@ class LockServer(ThreadingHTTPServer):
     allow_reuse_address = False
     daemon_threads = True
 
-    def __init__(self, service, static_dir, port=PORT):
+    def __init__(self, service, static_dir, port=PORT, launcher=None):
         super().__init__(("127.0.0.1", port), Handler)
         self.service = service
+        self.launcher = launcher
         self.static_dir = static_dir
 
 
@@ -103,6 +104,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, service.start_task(task_route[1]))
             elif task_route:
                 self._send_json(200, service.finish_task(task_route[1], json.loads(raw or b"{}").get("note")))
+            elif self.path == "/lernchat/start" and self.server.launcher:
+                self.server.launcher.start()
+                self._send_json(200, {"started": True})
             elif self.path == "/joker":
                 self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:

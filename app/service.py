@@ -8,7 +8,7 @@ import time
 
 from . import checks, history, lernchat
 
-LERNCHAT_HINT = "Öffne das Projekt in Claude Code und tippe /lernchat."
+LERNCHAT_HINT = "Der Knopf öffnet Claude Code mit /lernchat."
 LEETCODE_TTL_SECONDS = 120
 GITHUB_TTL_SECONDS = 300
 REMOTE_MIN_REFRESH_SECONDS = 5
@@ -47,7 +47,8 @@ def build_tasks(config):
          "min_note_chars": reading["min_note_chars"], "prompt": "Was hast du gelesen?"},
     ]
     if config.get("lernchat"):
-        tasks.append({"id": "lernchat", "title": "Lernchat", "kind": "lernchat", "hint": LERNCHAT_HINT})
+        tasks.append({"id": "lernchat", "title": "Lernchat", "kind": "lernchat", "hint": LERNCHAT_HINT,
+                      "action_path": "/lernchat/start", "action_text": "Lernchat starten"})
     tasks += [_custom_task(custom) for custom in config.get("custom_tasks", [])]
     ids = [task["id"] for task in tasks]
     if len(ids) != len(set(ids)) or not all(TASK_ID.match(task_id) for task_id in ids):
@@ -202,6 +203,8 @@ class LockService:
             "hint": task.get("hint"),
             "link": task.get("link"),
             "link_text": task.get("link_text"),
+            "action_path": task.get("action_path"),
+            "action_text": task.get("action_text"),
         }
 
     def _joker_status(self, today):

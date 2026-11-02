@@ -1,6 +1,10 @@
 """Lernchat: the chat logs one line per session, this counts them per week."""
 import datetime as dt
 import json
+import os
+import shutil
+import subprocess
+import threading
 
 from . import checks
 
@@ -64,3 +68,31 @@ def status(sessions, today, settings):
     language = settings["language_per_week"] - progress["language"]
     extra = ", davon eins in einer Sprache" if language > 0 else ""
     return {"done": False, "detail": f"{count}: heute ist ein Lernchat dran{extra}"}
+
+
+def find_claude(configured=None):
+    home_install = os.path.join(os.path.expanduser("~"), ".local", "bin", "claude.exe")
+    candidates = [configured, shutil.which("claude"), home_install]
+    return next((path for path in candidates if path and os.path.isfile(path)), None)
+
+
+class Launcher:
+    """Opens Claude Code with /lernchat in its own console window, one at a time."""
+
+    def __init__(self, project_dir, configured=None, popen=subprocess.Popen):
+        self.project_dir = project_dir
+        self.configured = configured
+        self.popen = popen
+        self.process = None
+        self.lock = threading.Lock()
+
+    def start(self):
+        with self.lock:
+            if self.process and self.process.poll() is None:
+                raise ValueError("Der Lernchat läuft schon")
+            path = find_claude(self.configured)
+            if not path:
+                raise ValueError("Claude Code wurde nicht gefunden. Trag den Pfad in config.json unter "
+                                 "lernchat.claude_path ein")
+            flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+            self.process = self.popen([path, "/lernchat"], cwd=self.project_dir, creationflags=flags)

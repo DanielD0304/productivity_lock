@@ -542,6 +542,40 @@ class LernchatTest(ServiceBase):
         self.assertNotIn("lernchat", [task["id"] for task in build_tasks(CONFIG)])
 
 
+class LauncherTest(unittest.TestCase):
+    def setUp(self):
+        self.calls = []
+        self.finished = None
+        self.exe = os.path.join(tempfile.mkdtemp(), "claude.exe")
+        self.addCleanup(shutil.rmtree, os.path.dirname(self.exe), ignore_errors=True)
+        open(self.exe, "w").close()
+
+    def popen(self, command, **options):
+        self.calls.append((command, options))
+        return mock.Mock(poll=lambda: self.finished)
+
+    def test_starts_claude_with_the_skill_in_the_project(self):
+        lernchat.Launcher("proj", self.exe, popen=self.popen).start()
+        self.assertEqual(self.calls[0][0], [self.exe, "/lernchat"])
+        self.assertEqual(self.calls[0][1]["cwd"], "proj")
+
+    def test_second_start_is_refused_while_running(self):
+        launcher = lernchat.Launcher("proj", self.exe, popen=self.popen)
+        launcher.start()
+        with self.assertRaises(ValueError):
+            launcher.start()
+        self.finished = 0
+        launcher.start()
+        self.assertEqual(len(self.calls), 2)
+
+    def test_missing_claude_is_explained(self):
+        with mock.patch.object(lernchat, "find_claude", return_value=None):
+            with self.assertRaises(ValueError) as caught:
+                lernchat.Launcher("proj", popen=self.popen).start()
+        self.assertIn("claude_path", str(caught.exception))
+        self.assertEqual(self.calls, [])
+
+
 class GitHubParseTest(unittest.TestCase):
     start = dt.datetime(2026, 10, 31, 4, 0)
 
@@ -777,10 +811,14 @@ class ServerTest(unittest.TestCase):
         self.service = LockService(CONFIG, self.dir, anki_check=lambda now: ready,
                                    leetcode_check=lambda user, start: ready)
         static = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
-        self.server = LockServer(self.service, static, port=self.PORT)
+        self.launches = []
+        self.server = LockServer(self.service, static, port=self.PORT, launcher=self)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
+
+    def start(self):
+        self.launches.append(1)
 
     def request(self, path, method="GET", body=None, origin=None, host=None):
         request = urllib.request.Request(f"http://127.0.0.1:{self.PORT}{path}", method=method,
@@ -819,6 +857,15 @@ class ServerTest(unittest.TestCase):
         code, _, _ = self.request("/joker", method="POST", body={"reason": "krank"}, origin="https://evil.example")
         self.assertEqual(code, 403)
         self.assertFalse(self.service.status()["joker"]["active"])
+
+    def test_lernchat_start_launches_once_per_request(self):
+        self.assertEqual(self.request("/lernchat/start", method="POST", body={})[0], 200)
+        self.assertEqual(len(self.launches), 1)
+
+    def test_foreign_website_cannot_launch_lernchat(self):
+        code, _, _ = self.request("/lernchat/start", method="POST", body={}, origin="https://evil.example")
+        self.assertEqual(code, 403)
+        self.assertEqual(self.launches, [])
 
     def test_rebinding_host_is_refused(self):
         self.assertEqual(self.request("/status", host="evil.example:47615")[0], 403)

@@ -60,7 +60,8 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 ## Lernchat
 
 Dreimal pro Woche ein kurzer Chat mit Claude: Quiz zur nächsten Prüfung, ein Thema selbst erklären oder eine Sprache
-üben. Du startest ihn in Claude Code mit `/lernchat` im Projektordner. Der Skill sucht über deine
+üben. Du startest ihn mit dem Knopf „Lernchat starten“ auf der Checkliste. Er öffnet Claude Code mit `/lernchat` in
+einem eigenen Fenster (Pfad zur `claude.exe` bei Bedarf in `lernchat.claude_path`). Der Skill sucht über deine
 Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan
 dran ist. Am Ende trägt er das Ergebnis mit `scripts/lernchat.py` in `data/lernchat.jsonl` ein.
 
