@@ -573,6 +573,48 @@ class LernchatTest(ServiceBase):
         self.assertNotIn("lernchat", [task["id"] for task in build_tasks(CONFIG)])
 
 
+class RequiredTasksTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.config = {**CONFIG, "required_tasks": 3,
+                       "custom_tasks": [{"id": "sport", "title": "Sport", "type": "check"}]}
+        self.service = LockService(self.config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def status(self):
+        return self.service.status(network=False)
+
+    def test_three_of_four_unlock(self):
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.assertFalse(self.status()["unlocked"])
+        self.read_fully()
+        status = self.status()
+        self.assertTrue(status["unlocked"])
+        self.assertEqual(status["required"], 3)
+        self.assertFalse(status["checks"]["sport"]["done"])
+
+    def test_two_of_four_stay_locked(self):
+        self.anki = {"done": True, "detail": "ok", "error": None}
+        self.read_fully()
+        self.assertFalse(self.status()["unlocked"])
+
+    def test_day_with_three_counts_as_done_in_history(self):
+        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+        self.service.status()
+        self.read_fully()
+        self.status()
+        self.assertEqual(self.status()["history"]["days"][self.status()["day"]], "done")
+
+    def test_without_setting_everything_is_needed(self):
+        self.service = LockService(CONFIG, self.dir, clock=self.clock,
+                                   anki_check=lambda now: {"done": True, "detail": "ok", "error": None},
+                                   leetcode_check=self.fake_leetcode)
+        self.read_fully()
+        self.assertFalse(self.status()["unlocked"])
+        self.assertEqual(self.status()["required"], 3)
+
+
 class LauncherTest(unittest.TestCase):
     def setUp(self):
         self.calls = []

@@ -30,6 +30,9 @@ Abschalten: `powershell -ExecutionPolicy Bypass -File .\uninstall_autostart.ps1`
 | LeetCode | Mindestens eine akzeptierte Lösung seit 4 Uhr |
 | Lesen | 20-Minuten-Timer abgelaufen und ein Satz dazu (mindestens 20 Zeichen) |
 
+Von den vier Aufgaben (Anki, LeetCode, Lesen, Lernchat) genügen drei pro Tag, eingestellt mit `required_tasks` in
+`config.json`. Fehlt der Wert, müssen alle erledigt sein. Ein Tag mit drei erledigten Aufgaben zählt für die Serie.
+
 Für schlechte Tage gibt es einen Joker pro Kalenderwoche (`joker.per_week`): Du setzt ihn auf der Checkliste mit einer
 kurzen Begründung ein, und alles ist bis zum nächsten Tag um 4 Uhr frei. Die Woche beginnt montags um 4 Uhr, nicht
 genutzte Joker verfallen.
@@ -59,7 +62,7 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 
 ## Lernchat
 
-Dreimal pro Woche ein kurzer Chat mit Claude: Quiz zur nächsten Prüfung, ein Thema selbst erklären oder eine Sprache
+Fünfmal pro Woche ein kurzer Chat mit Claude: Quiz zur nächsten Prüfung, ein Thema selbst erklären oder eine Sprache
 üben. Du startest ihn mit dem Knopf „Lernchat starten“ auf der Checkliste. Er öffnet Claude Code mit `/lernchat` in
 einem eigenen Fenster (Pfad zur `claude.exe` bei Bedarf in `lernchat.claude_path`). Der Skill sucht über deine
 Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan
@@ -69,7 +72,7 @@ Einstellungen in `config.json` unter `lernchat`:
 
 | Wert | Bedeutung |
 | --- | --- |
-| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (3) |
+| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (5) |
 | `language_per_week` | Davon mindestens so viele in einer Sprache (1) |
 | `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
 
@@ -83,7 +86,7 @@ Score schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem 
 zweite Runde.
 
 Pro Tag zählt höchstens ein Chat. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur noch für
-das Wochenziel reichen, bei 3 pro Woche also ab Freitag. An allen Tagen davor steht sie auf „Heute frei“. Ist das
+das Wochenziel reichen, bei 5 pro Woche also ab Mittwoch. An Montag und Dienstag steht sie auf „Heute frei“. Ist das
 Ziel erreicht, bleibt sie bis Montag 4 Uhr frei. Die Punktzahl bewertet Claude selbst. Wer sie hochschreibt, betrügt
 nur sich. Ohne `lernchat` in der Config gibt es die Aufgabe nicht.
 

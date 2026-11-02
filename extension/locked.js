@@ -182,9 +182,11 @@ function moveMonth(step) {
 async function render(status) {
   const checks = Object.values(status.checks);
   const finished = checks.filter((check) => check.done).length;
-  const allDone = finished === checks.length;
+  const allDone = finished >= status.required;
   $("offline").hidden = true;
-  $("progress").textContent = `${finished} von ${checks.length} erledigt`;
+  const optional = checks.length - status.required;
+  $("progress").textContent = `${finished} von ${checks.length} erledigt`
+    + (optional > 0 ? ` · ${status.required} genügen` : "");
   $("title").textContent = title(status, allDone);
   renderJoker(status.joker, allDone);
   for (const [id, check] of Object.entries(status.checks)) renderTask(id, check);

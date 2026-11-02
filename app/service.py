@@ -219,9 +219,13 @@ class LockService:
             "per_week": allowed,
         }
 
+    def _required(self, items):
+        """How many tasks unlock the day: `required_tasks`, or all of them when it is not set."""
+        return min(self.config.get("required_tasks", len(items)), len(items))
+
     def _record_history(self, today, items, joker):
         finished = sum(item["done"] for item in items.values())
-        if finished == len(items):
+        if finished >= self._required(items):
             result = "done"
         elif joker["active"]:
             result = "joker"
@@ -244,10 +248,13 @@ class LockService:
             today = self._today()
             items = {task["id"]: self._task_status(task, today) for task in self.tasks}
             joker = self._joker_status(today)
+            finished = sum(item["done"] for item in items.values())
+            required = self._required(items)
             self._record_history(today, items, joker)
             return {
                 "day": today["day"],
-                "unlocked": joker["active"] or all(item["done"] for item in items.values()),
+                "unlocked": joker["active"] or finished >= required,
+                "required": required,
                 "checks": items,
                 "joker": joker,
                 "history": history.summarize(today.get("history", {}), today["day"]),
