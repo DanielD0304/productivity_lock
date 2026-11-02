@@ -73,6 +73,10 @@ Einstellungen in `config.json` unter `lernchat`:
 | `language_per_week` | Davon mindestens so viele in einer Sprache (1) |
 | `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
 
+Läuft der Chat, wird aus dem Knopf „Lernchat beenden“, der das Fenster schließt. Nach einem Chat mit zählendem
+Score schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem Schwellwert bleibt es offen für eine
+zweite Runde.
+
 Pro Tag zählt höchstens ein Chat. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur noch für
 das Wochenziel reichen, bei 3 pro Woche also ab Freitag. An allen Tagen davor steht sie auf „Heute frei“. Ist das
 Ziel erreicht, bleibt sie bis Montag 4 Uhr frei. Die Punktzahl bewertet Claude selbst. Wer sie hochschreibt, betrügt

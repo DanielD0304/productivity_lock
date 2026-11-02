@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import threading
+import time
 
 from . import checks
 
@@ -76,23 +77,78 @@ def find_claude(configured=None):
     return next((path for path in candidates if path and os.path.isfile(path)), None)
 
 
-class Launcher:
-    """Opens Claude Code with /lernchat in its own console window, one at a time."""
+def kill_tree(pid):
+    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, check=False)
 
-    def __init__(self, project_dir, configured=None, popen=subprocess.Popen):
+
+class Launcher:
+    """Opens Claude Code with /lernchat in its own console window, one at a time.
+
+    Once the chat has logged a passed session, the window closes by itself after a short grace period.
+    """
+
+    def __init__(self, project_dir, configured=None, log_path=None, min_score=0.7, grace_seconds=15,
+                 popen=subprocess.Popen, kill=kill_tree, sleep=time.sleep):
         self.project_dir = project_dir
         self.configured = configured
+        self.log_path = log_path
+        self.min_score = min_score
+        self.grace_seconds = grace_seconds
         self.popen = popen
+        self.kill = kill
+        self.sleep = sleep
         self.process = None
         self.lock = threading.Lock()
 
+    def running(self):
+        return self.process is not None and self.process.poll() is None
+
     def start(self):
         with self.lock:
-            if self.process and self.process.poll() is None:
-                raise ValueError("Der Lernchat läuft schon")
+            if self.running():
+                raise ValueError("Der Lernchat läuft schon. Schließ das Fenster oder beende ihn hier")
             path = find_claude(self.configured)
             if not path:
                 raise ValueError("Claude Code wurde nicht gefunden. Trag den Pfad in config.json unter "
                                  "lernchat.claude_path ein")
             flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+            offset = self._log_size()
             self.process = self.popen([path, "/lernchat"], cwd=self.project_dir, creationflags=flags)
+            if self.log_path:
+                threading.Thread(target=self._close_when_done, args=(self.process, offset), daemon=True).start()
+
+    def stop(self):
+        with self.lock:
+            if not self.running():
+                raise ValueError("Es läuft kein Lernchat")
+            self.kill(self.process.pid)
+
+    def _log_size(self):
+        try:
+            return os.path.getsize(self.log_path) if self.log_path else 0
+        except OSError:
+            return 0
+
+    def _passed_since(self, offset):
+        try:
+            with open(self.log_path, "rb") as file:
+                file.seek(offset)
+                lines = file.read().decode("utf-8", "replace").splitlines()
+        except OSError:
+            return False
+        for line in lines:
+            try:
+                if float(json.loads(line)["score"]) >= self.min_score:
+                    return True
+            except (ValueError, KeyError, TypeError):
+                continue
+        return False
+
+    def _close_when_done(self, process, offset):
+        while process.poll() is None:
+            if self._passed_since(offset):
+                self.sleep(self.grace_seconds)
+                if process.poll() is None:
+                    self.kill(process.pid)
+                return
+            self.sleep(3)

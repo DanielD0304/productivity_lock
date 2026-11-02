@@ -568,6 +568,38 @@ class LauncherTest(unittest.TestCase):
         launcher.start()
         self.assertEqual(len(self.calls), 2)
 
+    def test_stop_kills_the_running_window(self):
+        killed = []
+        launcher = lernchat.Launcher("proj", self.exe, popen=self.popen, kill=killed.append)
+        with self.assertRaises(ValueError):
+            launcher.stop()
+        self.process_pid = 42
+        launcher.start()
+        launcher.process.pid = 42
+        launcher.stop()
+        self.assertEqual(killed, [42])
+
+    def test_window_closes_after_a_passed_chat(self):
+        log = os.path.join(os.path.dirname(self.exe), "log.jsonl")
+        open(log, "w").write('{"score": 0.1}\n')
+        killed, waits = [], []
+        process = mock.Mock(pid=7, poll=lambda: None)
+        launcher = lernchat.Launcher("proj", self.exe, log, 0.7, 15, popen=lambda *a, **k: process,
+                                     kill=killed.append, sleep=waits.append)
+        offset = launcher._log_size()
+        open(log, "a").write('{"score": 0.5}\n')
+        self.assertFalse(launcher._passed_since(offset))
+        open(log, "a").write('{"score": 0.9}\n')
+        launcher._close_when_done(process, offset)
+        self.assertEqual(killed, [7])
+        self.assertIn(15, waits)
+
+    def test_old_results_do_not_close_a_new_window(self):
+        log = os.path.join(os.path.dirname(self.exe), "log.jsonl")
+        open(log, "w").write('{"score": 0.9}\n')
+        launcher = lernchat.Launcher("proj", self.exe, log, 0.7)
+        self.assertFalse(launcher._passed_since(launcher._log_size()))
+
     def test_missing_claude_is_explained(self):
         with mock.patch.object(lernchat, "find_claude", return_value=None):
             with self.assertRaises(ValueError) as caught:
@@ -812,6 +844,7 @@ class ServerTest(unittest.TestCase):
                                    leetcode_check=lambda user, start: ready)
         static = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
         self.launches = []
+        self.stops = []
         self.server = LockServer(self.service, static, port=self.PORT, launcher=self)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.addCleanup(self.server.server_close)
@@ -819,6 +852,12 @@ class ServerTest(unittest.TestCase):
 
     def start(self):
         self.launches.append(1)
+
+    def stop(self):
+        self.stops.append(1)
+
+    def running(self):
+        return getattr(self, "running_now", False)
 
     def request(self, path, method="GET", body=None, origin=None, host=None):
         request = urllib.request.Request(f"http://127.0.0.1:{self.PORT}{path}", method=method,
@@ -861,6 +900,15 @@ class ServerTest(unittest.TestCase):
     def test_lernchat_start_launches_once_per_request(self):
         self.assertEqual(self.request("/lernchat/start", method="POST", body={})[0], 200)
         self.assertEqual(len(self.launches), 1)
+
+    def test_stop_endpoint_and_running_state(self):
+        self.running_now = True
+        self.service.config = {**CONFIG, "lernchat": {"per_week": 3, "language_per_week": 1, "min_score": 0.7}}
+        self.service.tasks = build_tasks(self.service.config)
+        status = json.loads(self.request("/status")[1])["checks"]["lernchat"]
+        self.assertEqual(status["action_path"], "/lernchat/stop")
+        self.assertEqual(self.request("/lernchat/stop", method="POST", body={})[0], 200)
+        self.assertEqual(self.stops, [1])
 
     def test_foreign_website_cannot_launch_lernchat(self):
         code, _, _ = self.request("/lernchat/start", method="POST", body={}, origin="https://evil.example")

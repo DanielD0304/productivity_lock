@@ -75,7 +75,11 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path == "/status":
             refresh = parse_qs(url.query).get("refresh") == ["1"]
-            self._send_json(200, self.server.service.status(refresh=refresh))
+            status = self.server.service.status(refresh=refresh)
+            launcher = self.server.launcher
+            if launcher and "lernchat" in status["checks"] and launcher.running():
+                status["checks"]["lernchat"].update(action_path="/lernchat/stop", action_text="Lernchat beenden")
+            self._send_json(200, status)
         elif url.path in STATIC_FILES:
             name, content_type = STATIC_FILES[url.path]
             with open(os.path.join(self.server.static_dir, name), "rb") as file:
@@ -107,6 +111,9 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/lernchat/start" and self.server.launcher:
                 self.server.launcher.start()
                 self._send_json(200, {"started": True})
+            elif self.path == "/lernchat/stop" and self.server.launcher:
+                self.server.launcher.stop()
+                self._send_json(200, {"stopped": True})
             elif self.path == "/joker":
                 self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:

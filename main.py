@@ -34,7 +34,9 @@ def main():
 
     service = LockService(config, args.data_dir)
     enforcer = Enforcer(config["blocked_processes"], config["game_process"])
-    launcher = Launcher(ROOT, config.get("lernchat", {}).get("claude_path"))
+    chat = config.get("lernchat", {})
+    launcher = Launcher(ROOT, chat.get("claude_path"), os.path.join(args.data_dir, "lernchat.jsonl"),
+                        chat.get("min_score", 0.7))
     server = LockServer(service, os.path.join(ROOT, "extension"), launcher=launcher)
     threading.Thread(
         target=run_loop,
