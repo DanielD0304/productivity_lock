@@ -73,6 +73,11 @@ Einstellungen in `config.json` unter `lernchat`:
 | `language_per_week` | Davon mindestens so viele in einer Sprache (1) |
 | `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
 
+Jede Runde wird eingetragen, auch eine schlechte, zusammen mit den Schwächen (`weak`) und den Punkten, die jetzt
+sitzen (`fixed`). Eine Schwäche bleibt offen, bis eine spätere Runde sie als gelöst meldet, und kommt im nächsten Chat
+zuerst wieder dran. Liegt der Score unter `min_score`, ist die Aufgabe heute offen, auch an einem freien Tag, bis eine
+Wiederholungsrunde besteht. Den Stand zeigt `python scripts/lernchat.py status`.
+
 Läuft der Chat, wird aus dem Knopf „Lernchat beenden“, der das Fenster schließt. Nach einem Chat mit zählendem
 Score schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem Schwellwert bleibt es offen für eine
 zweite Runde.

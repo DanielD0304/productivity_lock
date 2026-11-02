@@ -532,6 +532,37 @@ class LernchatTest(ServiceBase):
         os.remove(self.service.lernchat_path)
         self.assertTrue(self.status()["done"])
 
+    def test_failed_chat_today_must_be_repeated(self):
+        self.set_day(27)  # a free day
+        self.assertTrue(self.status()["done"])
+        self.chat(27, score=0.4)
+        self.assertFalse(self.status()["done"])
+        self.assertIn("nochmal", self.status()["detail"])
+        self.assertFalse(self.service.status(network=False)["unlocked"])
+        self.chat(27, score=0.9)
+        self.assertTrue(self.status()["done"])
+
+    def test_free_day_is_not_remembered_as_done(self):
+        self.set_day(27)
+        self.assertTrue(self.status()["done"])
+        self.assertNotIn("lernchat", self.service.state["done"])
+
+    def test_weak_points_stay_open_until_fixed(self):
+        def entry(day, weak=(), fixed=()):
+            return lernchat.log_entry(dt.datetime(2026, 10, day, 20), "SML", "quiz", "Rejection", 0.5, weak, fixed)
+        entries = [entry(26, weak=["Envelope", "Akzeptanzrate"]), entry(27, fixed=["envelope"]),
+                   entry(28, weak=["Importance Weights"])]
+        for item in entries:
+            item["at"] = dt.datetime.fromisoformat(item["at"])
+        points = [p["point"] for p in lernchat.open_weak_points(entries)]
+        self.assertEqual(points, ["Akzeptanzrate", "Importance Weights"])
+
+    def test_weak_points_are_read_from_the_log(self):
+        with open(self.service.lernchat_path, "w", encoding="utf-8") as file:
+            file.write(json.dumps(lernchat.log_entry(NOW, "SML", "quiz", "MCMC", 0.5, ["Burn-in"])) + "\n")
+        points = lernchat.open_weak_points(lernchat.read_entries(self.service.lernchat_path))
+        self.assertEqual([p["point"] for p in points], ["Burn-in"])
+
     def test_invalid_entries_are_refused(self):
         with self.assertRaises(ValueError):
             lernchat.log_entry(NOW, "Mathe", "raten", "x", 0.5)

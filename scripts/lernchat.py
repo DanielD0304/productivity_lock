@@ -11,6 +11,21 @@ sys.path.insert(0, ROOT)
 from app import checks, lernchat  # noqa: E402
 
 
+def split(text):
+    return [part.strip() for part in text.split(";") if part.strip()]
+
+
+def print_weak_points(path, now):
+    points = lernchat.open_weak_points(lernchat.read_entries(path))
+    if not points:
+        print("Offene Schwächen: keine")
+        return
+    print("Offene Schwächen (älteste zuerst):")
+    for point in points[:10]:
+        age = (now - point["at"]).days
+        print(f"- {point['point']} ({point['subject']}: {point['topic']}, vor {age} Tagen)")
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -20,6 +35,8 @@ def main():
     log.add_argument("--mode", required=True, choices=lernchat.MODES)
     log.add_argument("--topic", required=True)
     log.add_argument("--score", required=True, type=float, help="0 bis 1")
+    log.add_argument("--weak", default="", help="Schwächen, getrennt mit ;")
+    log.add_argument("--fixed", default="", help="früher schwache Punkte, jetzt richtig, getrennt mit ;")
     args = parser.parse_args()
 
     with open(os.path.join(ROOT, "config.json"), encoding="utf-8") as file:
@@ -29,7 +46,8 @@ def main():
     rollover = config["day_rollover_hour"]
 
     if args.command == "log":
-        entry = lernchat.log_entry(dt.datetime.now(), args.subject, args.mode, args.topic, args.score)
+        entry = lernchat.log_entry(dt.datetime.now(), args.subject, args.mode, args.topic, args.score,
+                                   split(args.weak), split(args.fixed))
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as file:
             file.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -40,6 +58,9 @@ def main():
     progress = lernchat.week_progress(lernchat.read_sessions(path, rollover), today, settings)
     print(f"Diese Woche: {progress['total']}/{settings['per_week']} Chats, "
           f"davon {progress['language']}/{settings['language_per_week']} in einer Sprache.")
+    if progress["attempted_today"] and not progress["today"]:
+        print("Heute war noch kein Chat gut genug: nochmal machen, mit den Schwächen.")
+    print_weak_points(path, dt.datetime.now())
 
 
 if __name__ == "__main__":

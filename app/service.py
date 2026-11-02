@@ -134,10 +134,10 @@ class LockService:
             return {"done": True, "detail": today["done"]["lernchat"], "error": None}
         sessions = lernchat.read_sessions(self.lernchat_path, self.config["day_rollover_hour"])
         result = lernchat.status(sessions, dt.date.fromisoformat(today["day"]), self.config["lernchat"])
-        if result["done"]:
+        if result.get("keep"):
             today["done"]["lernchat"] = result["detail"]
             self._save_state()
-        return {**result, "error": None}
+        return {"done": result["done"], "detail": result["detail"], "error": None}
 
     def _run_remote(self, task, start):
         if task["id"] == "leetcode":

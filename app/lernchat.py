@@ -13,13 +13,47 @@ MODES = ("quiz", "feynman", "sprache")
 WEEK_DAYS = 7
 
 
-def log_entry(at, subject, mode, topic, score):
+def log_entry(at, subject, mode, topic, score, weak=(), fixed=()):
+    """One session. `weak` are points that went wrong, `fixed` are earlier weak points answered right now."""
     if mode not in MODES:
         raise ValueError(f"Modus muss einer von {', '.join(MODES)} sein")
     if not 0 <= score <= 1:
         raise ValueError("Der Score liegt zwischen 0 und 1")
     return {"at": at.isoformat(timespec="seconds"), "subject": subject, "mode": mode,
-            "topic": topic, "score": round(score, 2)}
+            "topic": topic, "score": round(score, 2), "weak": list(weak), "fixed": list(fixed)}
+
+
+def read_entries(path):
+    """All readable log lines, oldest first, with `at` parsed."""
+    try:
+        with open(path, encoding="utf-8") as file:
+            lines = file.read().splitlines()
+    except OSError:
+        return []
+    entries = []
+    for line in lines:
+        try:
+            entry = json.loads(line)
+            entry["at"] = dt.datetime.fromisoformat(entry["at"])
+            float(entry["score"])
+            entries.append(entry)
+        except (ValueError, KeyError, TypeError):
+            continue
+    return sorted(entries, key=lambda entry: entry["at"])
+
+
+def open_weak_points(entries):
+    """Weak points no later session has marked as fixed, oldest first."""
+    open_points = {}
+    for entry in entries:
+        for point in entry.get("fixed", []):
+            open_points.pop(str(point).strip().lower(), None)
+        for point in entry.get("weak", []):
+            key = str(point).strip().lower()
+            if key:
+                open_points[key] = {"point": str(point).strip(), "at": entry["at"],
+                                    "subject": entry.get("subject", ""), "topic": entry.get("topic", "")}
+    return sorted(open_points.values(), key=lambda point: point["at"])
 
 
 def read_sessions(path, rollover_hour):
@@ -52,7 +86,8 @@ def week_progress(sessions, today, settings):
     language = len({s["day"] for s in passed if s["mode"] == "sprache"})
     needed = max(0, settings["per_week"] - total, settings["language_per_week"] - language)
     return {"total": total, "language": language, "needed": needed,
-            "today": any(s["day"] == today for s in passed)}
+            "today": any(s["day"] == today for s in passed),
+            "attempted_today": any(s["day"] == today for s in sessions)}
 
 
 def status(sessions, today, settings):
@@ -61,7 +96,10 @@ def status(sessions, today, settings):
     count = f"{progress['total']}/{settings['per_week']} diese Woche"
     days_left = WEEK_DAYS - today.weekday()
     if progress["today"]:
-        return {"done": True, "detail": f"Heute erledigt ({count})"}
+        return {"done": True, "keep": True, "detail": f"Heute erledigt ({count})"}
+    if progress["attempted_today"]:
+        return {"done": False, "detail": f"Der Chat heute war zu schwach (unter {settings['min_score']:.0%}), "
+                                         "bitte nochmal mit den Schwächen"}
     if progress["needed"] == 0:
         return {"done": True, "detail": f"Wochenziel geschafft ({count})"}
     if progress["needed"] < days_left:
