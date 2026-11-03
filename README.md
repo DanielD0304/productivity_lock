@@ -58,35 +58,41 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 - `timer`: Timer mit eigener Dauer und danach eine Notiz. Die Notizen stehen in `data/notes_log.jsonl`.
 - `github`: mindestens ein Push seit 4 Uhr. Das sieht nur Pushes in **öffentliche** Repositories.
 
-## Lernchat
+## Lernchat und Sprachchat
 
-Fünfmal pro Woche ein kurzer Chat mit Claude: Quiz zur nächsten Prüfung, ein Thema selbst erklären oder eine Sprache
-üben. Du startest ihn mit dem Knopf „Lernchat starten“ auf der Checkliste. Er öffnet Claude Code mit `/lernchat` in
-einem eigenen Fenster (Pfad zur `claude.exe` bei Bedarf in `lernchat.claude_path`). Der Skill sucht über deine
-Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan
-dran ist. Am Ende trägt er das Ergebnis mit `scripts/lernchat.py` in `data/lernchat.jsonl` ein.
+Zwei Aufgaben, jede fünfmal pro Woche ein kurzer Chat mit Claude. Du startest sie mit dem Knopf an der Aufgabe auf der
+Checkliste. Er öffnet Claude Code in einem eigenen Fenster mit dem passenden Skill (Pfad zur `claude.exe` bei Bedarf in
+`claude_path` in der `config.json`).
 
-Einstellungen in `config.json` unter `lernchat`:
+- **Lernchat** (`/lernchat`): Quiz oder Feynman (du erklärst) zur nächsten Prüfung. Der Skill sucht über deine
+  Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan dran
+  ist.
+- **Sprachchat** (`/sprachchat`): Englisch, Spanisch oder Chinesisch, du wählst am Anfang. Pro Sprache gibt es zuerst
+  eine **Sprachevaluation** (Niveau nach GER, bei Chinesisch auch HSK). Danach lernt der Chat schrittweise auf diesem
+  Niveau: erst die offenen Schwächen, dann neues Material, dann Anwenden. Nach drei starken Chats hebt er das Niveau an.
+
+Jede Runde wird mit `scripts/chat.py` in `data/lernchat.jsonl` bzw. `data/sprachchat.jsonl` eingetragen, auch eine
+schlechte, zusammen mit den Schwächen (`weak`) und den Punkten, die jetzt sitzen (`fixed`). Eine Schwäche bleibt offen,
+bis eine spätere Runde sie als gelöst meldet, und kommt im nächsten Chat zuerst wieder dran. Den Stand zeigen
+`python scripts/chat.py lernchat status` und `python scripts/chat.py sprachchat status`.
+
+Einstellungen in `config.json` unter `lernchat` und `sprachchat`:
 
 | Wert | Bedeutung |
 | --- | --- |
-| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (5) |
-| `language_per_week` | Davon mindestens so viele in einer Sprache (1) |
+| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (je 5) |
 | `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
+| `languages` | Nur Sprachchat: Sprachcode und Name der wählbaren Sprachen |
 
-Jede Runde wird eingetragen, auch eine schlechte, zusammen mit den Schwächen (`weak`) und den Punkten, die jetzt
-sitzen (`fixed`). Eine Schwäche bleibt offen, bis eine spätere Runde sie als gelöst meldet, und kommt im nächsten Chat
-zuerst wieder dran. Liegt der Score unter `min_score`, ist die Aufgabe heute offen, auch an einem freien Tag, bis eine
-Wiederholungsrunde besteht. Den Stand zeigt `python scripts/lernchat.py status`.
+Liegt der Score unter `min_score`, ist die Aufgabe heute offen, auch an einem freien Tag, bis eine Wiederholungsrunde
+besteht. Läuft ein Chat, wird aus dem Knopf „… beenden“, der das Fenster schließt. Nach einem Chat mit zählendem Score
+schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem Schwellwert bleibt es offen für eine zweite
+Runde.
 
-Läuft der Chat, wird aus dem Knopf „Lernchat beenden“, der das Fenster schließt. Nach einem Chat mit zählendem
-Score schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem Schwellwert bleibt es offen für eine
-zweite Runde.
-
-Pro Tag zählt höchstens ein Chat. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur noch für
-das Wochenziel reichen, bei 5 pro Woche also ab Mittwoch. An Montag und Dienstag steht sie auf „Heute frei“. Ist das
-Ziel erreicht, bleibt sie bis Montag 4 Uhr frei. Die Punktzahl bewertet Claude selbst. Wer sie hochschreibt, betrügt
-nur sich. Ohne `lernchat` in der Config gibt es die Aufgabe nicht.
+Pro Tag zählt höchstens ein Chat je Aufgabe. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur
+noch für das Wochenziel reichen, bei 5 pro Woche also ab Mittwoch. An Montag und Dienstag steht sie auf „Heute frei“. Ist
+das Ziel erreicht, bleibt sie bis Montag 4 Uhr frei. Die Punktzahl bewertet Claude selbst. Wer sie hochschreibt, betrügt
+nur sich. Ohne `lernchat` oder `sprachchat` in der Config gibt es die jeweilige Aufgabe nicht.
 
 ## Verlauf und Tray-Symbol
 

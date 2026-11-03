@@ -19,8 +19,16 @@
   },
   "lernchat": {
     "per_week": 5,
-    "language_per_week": 1,
     "min_score": 0.7
+  },
+  "sprachchat": {
+    "per_week": 5,
+    "min_score": 0.7,
+    "languages": {
+      "en": "Englisch",
+      "es": "Spanisch",
+      "zh": "Chinesisch"
+    }
   },
   "custom_tasks": [],
   "reminders": ["19:00", "21:30"],

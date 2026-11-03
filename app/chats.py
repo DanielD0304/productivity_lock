@@ -1,4 +1,4 @@
-"""Lernchat: the chat logs one line per session, this counts them per week."""
+"""Lernchat and Sprachchat: a chat logs one line per session, this counts them per week."""
 import datetime as dt
 import json
 import os
@@ -9,18 +9,28 @@ import time
 
 from . import checks
 
-MODES = ("quiz", "feynman", "sprache")
 WEEK_DAYS = 7
+# id -> checklist title, Claude Code skill the button opens, and the modes a session can have.
+CHATS = {
+    "lernchat": {"title": "Lernchat", "skill": "/lernchat", "modes": ("quiz", "feynman")},
+    "sprachchat": {"title": "Sprachchat", "skill": "/sprachchat", "modes": ("evaluation", "lernen", "gespraech")},
+}
 
 
-def log_entry(at, subject, mode, topic, score, weak=(), fixed=()):
-    """One session. `weak` are points that went wrong, `fixed` are earlier weak points answered right now."""
-    if mode not in MODES:
-        raise ValueError(f"Modus muss einer von {', '.join(MODES)} sein")
+def log_entry(at, subject, mode, topic, score, weak=(), fixed=(), level=None, modes=None):
+    """One session. `weak` are points that went wrong, `fixed` are earlier weak points answered right now.
+
+    `level` is the language level the session found or confirmed (Sprachchat only).
+    """
+    if modes and mode not in modes:
+        raise ValueError(f"Modus muss einer von {', '.join(modes)} sein")
     if not 0 <= score <= 1:
         raise ValueError("Der Score liegt zwischen 0 und 1")
-    return {"at": at.isoformat(timespec="seconds"), "subject": subject, "mode": mode,
-            "topic": topic, "score": round(score, 2), "weak": list(weak), "fixed": list(fixed)}
+    entry = {"at": at.isoformat(timespec="seconds"), "subject": subject, "mode": mode,
+             "topic": topic, "score": round(score, 2), "weak": list(weak), "fixed": list(fixed)}
+    if level:
+        entry["level"] = level
+    return entry
 
 
 def read_entries(path):
@@ -42,10 +52,17 @@ def read_entries(path):
     return sorted(entries, key=lambda entry: entry["at"])
 
 
-def open_weak_points(entries):
+def latest_levels(entries):
+    """The most recent level per subject, from the newest session that named one."""
+    return {entry["subject"]: entry["level"] for entry in entries if entry.get("level")}
+
+
+def open_weak_points(entries, subject=None):
     """Weak points no later session has marked as fixed, oldest first."""
     open_points = {}
     for entry in entries:
+        if subject is not None and entry.get("subject") != subject:
+            continue
         for point in entry.get("fixed", []):
             open_points.pop(str(point).strip().lower(), None)
         for point in entry.get("weak", []):
@@ -83,14 +100,13 @@ def week_progress(sessions, today, settings):
     monday = today - dt.timedelta(days=today.weekday())
     passed = [s for s in sessions if monday <= s["day"] <= today and s["score"] >= settings["min_score"]]
     total = len({s["day"] for s in passed})
-    language = len({s["day"] for s in passed if s["mode"] == "sprache"})
-    needed = max(0, settings["per_week"] - total, settings["language_per_week"] - language)
-    return {"total": total, "language": language, "needed": needed,
+    needed = max(0, settings["per_week"] - total)
+    return {"total": total, "needed": needed,
             "today": any(s["day"] == today for s in passed),
             "attempted_today": any(s["day"] == today for s in sessions)}
 
 
-def status(sessions, today, settings):
+def status(sessions, today, settings, title="Lernchat"):
     """Required only once the remaining days are just enough to reach the weekly goal."""
     progress = week_progress(sessions, today, settings)
     count = f"{progress['total']}/{settings['per_week']} diese Woche"
@@ -98,15 +114,13 @@ def status(sessions, today, settings):
     if progress["today"]:
         return {"done": True, "keep": True, "detail": f"Heute erledigt ({count})"}
     if progress["attempted_today"]:
-        return {"done": False, "detail": f"Der Chat heute war zu schwach (unter {settings['min_score']:.0%}), "
+        return {"done": False, "detail": f"Der {title} heute war zu schwach (unter {settings['min_score']:.0%}), "
                                          "bitte nochmal mit den Schwächen"}
     if progress["needed"] == 0:
         return {"done": True, "detail": f"Wochenziel geschafft ({count})"}
     if progress["needed"] < days_left:
         return {"done": True, "detail": f"Heute frei ({count})"}
-    language = settings["language_per_week"] - progress["language"]
-    extra = ", davon eins in einer Sprache" if language > 0 else ""
-    return {"done": False, "detail": f"{count}: heute ist ein Lernchat dran{extra}"}
+    return {"done": False, "detail": f"{count}: heute ist ein {title} dran"}
 
 
 def find_claude(configured=None):
@@ -120,14 +134,15 @@ def kill_tree(pid):
 
 
 class Launcher:
-    """Opens Claude Code with /lernchat in its own console window, one at a time.
+    """Opens Claude Code with a chat skill in its own console window, one at a time.
 
     Once the chat has logged a passed session, the window closes by itself after a short grace period.
     """
 
-    def __init__(self, project_dir, configured=None, log_path=None, min_score=0.7, grace_seconds=15,
-                 popen=subprocess.Popen, kill=kill_tree, sleep=time.sleep):
+    def __init__(self, project_dir, skill="/lernchat", configured=None, log_path=None, min_score=0.7,
+                 grace_seconds=15, popen=subprocess.Popen, kill=kill_tree, sleep=time.sleep):
         self.project_dir = project_dir
+        self.skill = skill
         self.configured = configured
         self.log_path = log_path
         self.min_score = min_score
@@ -144,21 +159,21 @@ class Launcher:
     def start(self):
         with self.lock:
             if self.running():
-                raise ValueError("Der Lernchat läuft schon. Schließ das Fenster oder beende ihn hier")
+                raise ValueError("Der Chat läuft schon. Schließ das Fenster oder beende ihn hier")
             path = find_claude(self.configured)
             if not path:
                 raise ValueError("Claude Code wurde nicht gefunden. Trag den Pfad in config.json unter "
-                                 "lernchat.claude_path ein")
+                                 "claude_path ein")
             flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
             offset = self._log_size()
-            self.process = self.popen([path, "/lernchat"], cwd=self.project_dir, creationflags=flags)
+            self.process = self.popen([path, self.skill], cwd=self.project_dir, creationflags=flags)
             if self.log_path:
                 threading.Thread(target=self._close_when_done, args=(self.process, offset), daemon=True).start()
 
     def stop(self):
         with self.lock:
             if not self.running():
-                raise ValueError("Es läuft kein Lernchat")
+                raise ValueError("Es läuft kein Chat")
             self.kill(self.process.pid)
 
     def _log_size(self):

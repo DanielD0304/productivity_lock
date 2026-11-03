@@ -15,7 +15,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import checks, history, lernchat, tray
+from app import chats, checks, history, tray
 from app.enforcer import Enforcer, kill_process, run_loop, running_processes
 from app.server import LockServer
 from app.service import LockService, build_tasks
@@ -429,7 +429,7 @@ class CustomTaskTest(ServiceBase):
 
 
 class LernchatTest(ServiceBase):
-    CHAT = {"per_week": 3, "language_per_week": 1, "min_score": 0.7}
+    CHAT = {"per_week": 3, "min_score": 0.7}
 
     def setUp(self):
         super().setUp()
@@ -444,8 +444,8 @@ class LernchatTest(ServiceBase):
 
     def chat(self, day, mode="quiz", score=0.8, hour=20):
         moment = dt.datetime(2026, 10, day, hour)
-        entry = lernchat.log_entry(moment, "Mathe", mode, "Thema", score)
-        with open(self.service.lernchat_path, "a", encoding="utf-8") as file:
+        entry = chats.log_entry(moment, "Mathe", mode, "Thema", score)
+        with open(self.service.chat_paths["lernchat"], "a", encoding="utf-8") as file:
             file.write(json.dumps(entry) + "\n")
 
     def status(self):
@@ -466,7 +466,7 @@ class LernchatTest(ServiceBase):
 
     def test_passed_chat_today_unlocks(self):
         self.set_day(31)
-        self.chat(31, "sprache")
+        self.chat(31, "feynman")
         self.assertTrue(self.status()["done"])
 
     def test_low_score_does_not_count(self):
@@ -477,42 +477,32 @@ class LernchatTest(ServiceBase):
     def test_two_chats_on_one_day_count_once(self):
         self.chat(26)
         self.chat(26)
-        progress = lernchat.week_progress(
-            lernchat.read_sessions(self.service.lernchat_path, 4), dt.date(2026, 10, 27), self.CHAT)
+        progress = chats.week_progress(
+            chats.read_sessions(self.service.chat_paths["lernchat"], 4), dt.date(2026, 10, 27), self.CHAT)
         self.assertEqual(progress["total"], 1)
-
-    def test_language_chat_is_required_even_after_three_chats(self):
-        for day in (26, 27, 28):
-            self.chat(day)
-        self.set_day(31)
-        self.assertTrue(self.status()["done"])  # Sunday is still left for it
-        self.clock.value = dt.datetime(2026, 11, 1, 12).timestamp()
-        self.service.state["done"] = {}
-        self.assertFalse(self.status()["done"])
-        self.assertIn("Sprache", self.status()["detail"])
 
     def test_goal_reached_frees_the_rest_of_the_week(self):
         self.chat(26)
         self.chat(27)
-        self.chat(28, "sprache")
+        self.chat(28, "feynman")
         self.set_day(31)
         self.assertTrue(self.status()["done"])
         self.assertIn("Wochenziel", self.status()["detail"])
 
     def test_new_week_starts_at_zero(self):
         for day in (19, 20, 21):
-            self.chat(day, "sprache")
+            self.chat(day, "feynman")
         self.set_day(31)
         self.assertFalse(self.status()["done"])
 
     def test_chat_before_rollover_belongs_to_yesterday(self):
         self.chat(31, hour=2)
-        progress = lernchat.week_progress(
-            lernchat.read_sessions(self.service.lernchat_path, 4), dt.date(2026, 10, 31), self.CHAT)
+        progress = chats.week_progress(
+            chats.read_sessions(self.service.chat_paths["lernchat"], 4), dt.date(2026, 10, 31), self.CHAT)
         self.assertFalse(progress["today"])
 
     def test_broken_lines_are_skipped(self):
-        with open(self.service.lernchat_path, "w", encoding="utf-8") as file:
+        with open(self.service.chat_paths["lernchat"], "w", encoding="utf-8") as file:
             file.write('kaputt\n{"at": "heute"}\n')
         self.set_day(31)
         self.assertFalse(self.status()["done"])
@@ -521,7 +511,7 @@ class LernchatTest(ServiceBase):
         self.set_day(31)
         self.chat(31)
         self.assertTrue(self.status()["done"])
-        os.remove(self.service.lernchat_path)
+        os.remove(self.service.chat_paths["lernchat"])
         self.assertTrue(self.status()["done"])
 
     def test_failed_chat_today_must_be_repeated(self):
@@ -541,28 +531,85 @@ class LernchatTest(ServiceBase):
 
     def test_weak_points_stay_open_until_fixed(self):
         def entry(day, weak=(), fixed=()):
-            return lernchat.log_entry(dt.datetime(2026, 10, day, 20), "SML", "quiz", "Rejection", 0.5, weak, fixed)
+            return chats.log_entry(dt.datetime(2026, 10, day, 20), "SML", "quiz", "Rejection", 0.5, weak, fixed)
         entries = [entry(26, weak=["Envelope", "Akzeptanzrate"]), entry(27, fixed=["envelope"]),
                    entry(28, weak=["Importance Weights"])]
         for item in entries:
             item["at"] = dt.datetime.fromisoformat(item["at"])
-        points = [p["point"] for p in lernchat.open_weak_points(entries)]
+        points = [p["point"] for p in chats.open_weak_points(entries)]
         self.assertEqual(points, ["Akzeptanzrate", "Importance Weights"])
 
     def test_weak_points_are_read_from_the_log(self):
-        with open(self.service.lernchat_path, "w", encoding="utf-8") as file:
-            file.write(json.dumps(lernchat.log_entry(NOW, "SML", "quiz", "MCMC", 0.5, ["Burn-in"])) + "\n")
-        points = lernchat.open_weak_points(lernchat.read_entries(self.service.lernchat_path))
+        with open(self.service.chat_paths["lernchat"], "w", encoding="utf-8") as file:
+            file.write(json.dumps(chats.log_entry(NOW, "SML", "quiz", "MCMC", 0.5, ["Burn-in"])) + "\n")
+        points = chats.open_weak_points(chats.read_entries(self.service.chat_paths["lernchat"]))
         self.assertEqual([p["point"] for p in points], ["Burn-in"])
 
     def test_invalid_entries_are_refused(self):
         with self.assertRaises(ValueError):
-            lernchat.log_entry(NOW, "Mathe", "raten", "x", 0.5)
+            chats.log_entry(NOW, "Mathe", "raten", "x", 0.5, modes=chats.CHATS["lernchat"]["modes"])
         with self.assertRaises(ValueError):
-            lernchat.log_entry(NOW, "Mathe", "quiz", "x", 1.5)
+            chats.log_entry(NOW, "Mathe", "quiz", "x", 1.5)
 
     def test_task_is_absent_without_config(self):
         self.assertNotIn("lernchat", [task["id"] for task in build_tasks(CONFIG)])
+
+
+class SprachchatTest(ServiceBase):
+    CONFIG = {**CONFIG,
+              "lernchat": {"per_week": 5, "min_score": 0.7},
+              "sprachchat": {"per_week": 5, "min_score": 0.7, "languages": {"en": "Englisch", "es": "Spanisch"}}}
+
+    def setUp(self):
+        super().setUp()
+        self.service = LockService(self.CONFIG, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def log(self, language, mode, day=26, score=0.8, **extra):
+        entry = chats.log_entry(dt.datetime(2026, 10, day, 20), language, mode, "Thema", score, **extra,
+                                modes=chats.CHATS["sprachchat"]["modes"])
+        with open(self.service.chat_paths["sprachchat"], "a", encoding="utf-8") as file:
+            file.write(json.dumps(entry) + "\n")
+
+    def test_both_chats_are_separate_tasks(self):
+        checks_ = self.service.status(network=False)["checks"]
+        self.assertEqual(checks_["lernchat"]["action_path"], "/chats/lernchat/start")
+        self.assertEqual(checks_["sprachchat"]["action_path"], "/chats/sprachchat/start")
+        self.assertEqual(checks_["sprachchat"]["title"], "Sprachchat")
+
+    def test_chats_do_not_count_for_each_other(self):
+        self.clock.value = dt.datetime(2026, 10, 31, 12).timestamp()
+        self.log("es", "lernen", day=31)
+        checks_ = self.service.status(network=False)["checks"]
+        self.assertTrue(checks_["sprachchat"]["done"])
+        self.assertFalse(checks_["lernchat"]["done"])
+
+    def test_unknown_mode_is_refused(self):
+        with self.assertRaises(ValueError):
+            chats.log_entry(NOW, "es", "quiz", "x", 0.5, modes=chats.CHATS["sprachchat"]["modes"])
+
+    def test_level_is_the_latest_one_named(self):
+        self.log("es", "evaluation", day=26, level="A2")
+        self.log("es", "lernen", day=27)
+        self.log("en", "evaluation", day=27, level="B2")
+        self.log("es", "lernen", day=28, level="B1")
+        entries = chats.read_entries(self.service.chat_paths["sprachchat"])
+        self.assertEqual(chats.latest_levels(entries), {"es": "B1", "en": "B2"})
+
+    def test_weak_points_are_kept_per_language(self):
+        self.log("es", "lernen", day=26, weak=["ser/estar"])
+        self.log("en", "lernen", day=27, weak=["present perfect"])
+        self.log("es", "lernen", day=28, fixed=["Ser/Estar"])
+        entries = chats.read_entries(self.service.chat_paths["sprachchat"])
+        self.assertEqual([p["point"] for p in chats.open_weak_points(entries, "en")], ["present perfect"])
+        self.assertEqual(chats.open_weak_points(entries, "es"), [])
+
+    def test_failed_language_chat_must_be_repeated(self):
+        self.clock.value = dt.datetime(2026, 10, 27, 12).timestamp()
+        self.log("es", "lernen", day=27, score=0.3)
+        item = self.service.status(network=False)["checks"]["sprachchat"]
+        self.assertFalse(item["done"])
+        self.assertIn("Sprachchat", item["detail"])
 
 
 class LauncherTest(unittest.TestCase):
@@ -578,12 +625,12 @@ class LauncherTest(unittest.TestCase):
         return mock.Mock(poll=lambda: self.finished)
 
     def test_starts_claude_with_the_skill_in_the_project(self):
-        lernchat.Launcher("proj", self.exe, popen=self.popen).start()
-        self.assertEqual(self.calls[0][0], [self.exe, "/lernchat"])
+        chats.Launcher("proj", "/sprachchat", self.exe, popen=self.popen).start()
+        self.assertEqual(self.calls[0][0], [self.exe, "/sprachchat"])
         self.assertEqual(self.calls[0][1]["cwd"], "proj")
 
     def test_second_start_is_refused_while_running(self):
-        launcher = lernchat.Launcher("proj", self.exe, popen=self.popen)
+        launcher = chats.Launcher("proj", "/lernchat", self.exe, popen=self.popen)
         launcher.start()
         with self.assertRaises(ValueError):
             launcher.start()
@@ -593,7 +640,7 @@ class LauncherTest(unittest.TestCase):
 
     def test_stop_kills_the_running_window(self):
         killed = []
-        launcher = lernchat.Launcher("proj", self.exe, popen=self.popen, kill=killed.append)
+        launcher = chats.Launcher("proj", "/lernchat", self.exe, popen=self.popen, kill=killed.append)
         with self.assertRaises(ValueError):
             launcher.stop()
         self.process_pid = 42
@@ -607,8 +654,8 @@ class LauncherTest(unittest.TestCase):
         open(log, "w").write('{"score": 0.1}\n')
         killed, waits = [], []
         process = mock.Mock(pid=7, poll=lambda: None)
-        launcher = lernchat.Launcher("proj", self.exe, log, 0.7, 15, popen=lambda *a, **k: process,
-                                     kill=killed.append, sleep=waits.append)
+        launcher = chats.Launcher("proj", "/lernchat", self.exe, log, 0.7, 15, popen=lambda *a, **k: process,
+                                  kill=killed.append, sleep=waits.append)
         offset = launcher._log_size()
         open(log, "a").write('{"score": 0.5}\n')
         self.assertFalse(launcher._passed_since(offset))
@@ -620,13 +667,13 @@ class LauncherTest(unittest.TestCase):
     def test_old_results_do_not_close_a_new_window(self):
         log = os.path.join(os.path.dirname(self.exe), "log.jsonl")
         open(log, "w").write('{"score": 0.9}\n')
-        launcher = lernchat.Launcher("proj", self.exe, log, 0.7)
+        launcher = chats.Launcher("proj", "/lernchat", self.exe, log, 0.7)
         self.assertFalse(launcher._passed_since(launcher._log_size()))
 
     def test_missing_claude_is_explained(self):
-        with mock.patch.object(lernchat, "find_claude", return_value=None):
+        with mock.patch.object(chats, "find_claude", return_value=None):
             with self.assertRaises(ValueError) as caught:
-                lernchat.Launcher("proj", popen=self.popen).start()
+                chats.Launcher("proj", popen=self.popen).start()
         self.assertIn("claude_path", str(caught.exception))
         self.assertEqual(self.calls, [])
 
@@ -909,7 +956,7 @@ class ServerTest(unittest.TestCase):
         static = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
         self.launches = []
         self.stops = []
-        self.server = LockServer(self.service, static, port=self.PORT, launcher=self)
+        self.server = LockServer(self.service, static, port=self.PORT, launchers={"lernchat": self})
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
@@ -964,20 +1011,20 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(self.service.status()["checks"]["anki"]["joker"]["active"])
 
     def test_lernchat_start_launches_once_per_request(self):
-        self.assertEqual(self.request("/lernchat/start", method="POST", body={})[0], 200)
+        self.assertEqual(self.request("/chats/lernchat/start", method="POST", body={})[0], 200)
         self.assertEqual(len(self.launches), 1)
 
     def test_stop_endpoint_and_running_state(self):
         self.running_now = True
-        self.service.config = {**CONFIG, "lernchat": {"per_week": 3, "language_per_week": 1, "min_score": 0.7}}
+        self.service.config = {**CONFIG, "lernchat": {"per_week": 3, "min_score": 0.7}}
         self.service.tasks = build_tasks(self.service.config)
         status = json.loads(self.request("/status")[1])["checks"]["lernchat"]
-        self.assertEqual(status["action_path"], "/lernchat/stop")
-        self.assertEqual(self.request("/lernchat/stop", method="POST", body={})[0], 200)
+        self.assertEqual(status["action_path"], "/chats/lernchat/stop")
+        self.assertEqual(self.request("/chats/lernchat/stop", method="POST", body={})[0], 200)
         self.assertEqual(self.stops, [1])
 
     def test_foreign_website_cannot_launch_lernchat(self):
-        code, _, _ = self.request("/lernchat/start", method="POST", body={}, origin="https://evil.example")
+        code, _, _ = self.request("/chats/lernchat/start", method="POST", body={}, origin="https://evil.example")
         self.assertEqual(code, 403)
         self.assertEqual(self.launches, [])
 

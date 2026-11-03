@@ -11,6 +11,7 @@ ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 SAME_ORIGINS = {f"http://{host}" for host in ALLOWED_HOSTS}
 MAX_BODY_BYTES = 10_000
 TASK_ROUTE = re.compile(r"^/tasks/([a-z0-9_-]+)/(start|finish|joker)$")
+CHAT_ROUTE = re.compile(r"^/chats/([a-z0-9_-]+)/(start|stop)$")
 STATIC_FILES = {
     "/": ("locked.html", "text/html; charset=utf-8"),
     "/locked.js": ("locked.js", "text/javascript; charset=utf-8"),
@@ -23,10 +24,10 @@ class LockServer(ThreadingHTTPServer):
     allow_reuse_address = False
     daemon_threads = True
 
-    def __init__(self, service, static_dir, port=PORT, launcher=None):
+    def __init__(self, service, static_dir, port=PORT, launchers=None):
         super().__init__(("127.0.0.1", port), Handler)
         self.service = service
-        self.launcher = launcher
+        self.launchers = launchers or {}
         self.static_dir = static_dir
 
 
@@ -76,9 +77,10 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/status":
             refresh = parse_qs(url.query).get("refresh") == ["1"]
             status = self.server.service.status(refresh=refresh)
-            launcher = self.server.launcher
-            if launcher and "lernchat" in status["checks"] and launcher.running():
-                status["checks"]["lernchat"].update(action_path="/lernchat/stop", action_text="Lernchat beenden")
+            for chat_id, launcher in self.server.launchers.items():
+                check = status["checks"].get(chat_id)
+                if check and launcher.running():
+                    check.update(action_path=f"/chats/{chat_id}/stop", action_text=f"{check['title']} beenden")
             self._send_json(200, status)
         elif url.path in STATIC_FILES:
             name, content_type = STATIC_FILES[url.path]
@@ -103,6 +105,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length)
         service = self.server.service
         task_route = TASK_ROUTE.match(self.path)
+        chat_route = CHAT_ROUTE.match(self.path)
         try:
             if task_route and task_route[2] == "start":
                 self._send_json(200, service.start_task(task_route[1]))
@@ -110,12 +113,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, service.use_joker(task_route[1], json.loads(raw or b"{}").get("reason")))
             elif task_route:
                 self._send_json(200, service.finish_task(task_route[1], json.loads(raw or b"{}").get("note")))
-            elif self.path == "/lernchat/start" and self.server.launcher:
-                self.server.launcher.start()
-                self._send_json(200, {"started": True})
-            elif self.path == "/lernchat/stop" and self.server.launcher:
-                self.server.launcher.stop()
-                self._send_json(200, {"stopped": True})
+            elif chat_route and chat_route[1] in self.server.launchers:
+                launcher = self.server.launchers[chat_route[1]]
+                if chat_route[2] == "start":
+                    launcher.start()
+                else:
+                    launcher.stop()
+                self._send_json(200, {"ok": True})
             else:
                 self._send_json(404, {"error": "Nicht gefunden"})
         except ValueError as error:
