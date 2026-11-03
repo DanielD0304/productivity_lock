@@ -2,14 +2,11 @@ const API = "http://127.0.0.1:47615";
 const POLL_MS = 3000;
 const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const RESULT_CLASS = { done: "done", joker: "joker-day", partial: "partial" };
-const RESULT_LABEL = { done: "Geschafft", joker: "Joker", partial: "Teilweise" };
 const $ = (id) => document.getElementById(id);
 const inExtension = Boolean(globalThis.chrome?.runtime?.id);
 
 const timerEnds = new Map();
 let wasUnlocked = false;
-let jokerFormOpen = false;
 let shownMonth = null;
 let lastHistory = null;
 let lastCalendarKey = null;
@@ -30,6 +27,31 @@ function createRow(id) {
     error.hidden = true;
     try {
       await post(row.querySelector(".action").dataset.path);
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    }
+  });
+  const jokerForm = row.querySelector(".joker-form");
+  const setJokerOpen = (open) => {
+    row.dataset.jokerOpen = open ? "1" : "";
+    row.querySelector(".joker-error").hidden = true;
+    row.querySelector(".joker-open").hidden = open;
+    jokerForm.hidden = !open;
+    if (open) row.querySelector(".joker-reason").focus();
+  };
+  row.querySelector(".joker-open").addEventListener("click", () => setJokerOpen(true));
+  row.querySelector(".joker-cancel").addEventListener("click", () => setJokerOpen(false));
+  row.querySelector(".joker-reason").id = `joker-reason-${id}`;
+  row.querySelector(".joker-label").htmlFor = `joker-reason-${id}`;
+  jokerForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const error = row.querySelector(".joker-error");
+    error.hidden = true;
+    try {
+      await post(`/tasks/${id}/joker`, { reason: row.querySelector(".joker-reason").value });
+      row.dataset.jokerOpen = "";
+      await refresh();
     } catch (failure) {
       error.textContent = failure.message;
       error.hidden = false;
@@ -81,6 +103,14 @@ function renderTask(id, check) {
   action.textContent = check.action_text || "";
   action.dataset.path = check.action_path || "";
 
+  const jokerNote = check.joker.left > 0 ? "Joker frei diese Woche" : "Joker diese Woche verbraucht";
+  const canJoker = !check.done && check.joker.left > 0 && check.joker.per_week > 0;
+  const jokerOpen = canJoker && row.dataset.jokerOpen === "1";
+  row.classList.toggle("excused", check.joker_used);
+  row.querySelector(".joker-open").hidden = !canJoker || jokerOpen;
+  row.querySelector(".joker-form").hidden = !jokerOpen;
+  row.querySelector(".joker-open").title = jokerNote;
+
   row.querySelector(".start").hidden = check.state !== "idle";
   row.querySelector(".note-form").hidden = check.state !== "note";
   row.querySelector(".note-label").textContent = check.prompt || "";
@@ -99,23 +129,8 @@ function tickTimers() {
   }
 }
 
-function jokerText(joker) {
-  if (joker.active) return `Joker für heute eingesetzt: ${joker.reason}`;
-  if (joker.left > 0) return `Joker übrig diese Woche: ${joker.left} von ${joker.per_week}`;
-  return "Joker für diese Woche verbraucht. Am Montag gibt es neue.";
-}
-
-function renderJoker(joker, allDone) {
-  const canUse = !joker.active && !allDone && joker.left > 0;
-  $("joker").hidden = joker.per_week === 0 || (allDone && !joker.active);
-  $("joker-info").textContent = jokerText(joker);
-  $("joker-open").hidden = !canUse || jokerFormOpen;
-  $("joker-form").hidden = !canUse || !jokerFormOpen;
-}
-
-function title(status, allDone) {
-  if (allDone) return "Geschafft. Viel Spaß!";
-  return status.joker.active ? "Heute ist Pause. Morgen geht es weiter." : "Erst lernen, dann der Rest.";
+function title(allDone) {
+  return allDone ? "Geschafft. Viel Spaß!" : "Erst lernen, dann der Rest.";
 }
 
 function days(count) {
@@ -126,13 +141,22 @@ function isoDay(year, month, day) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+// 0 = nothing (red) up to 4 = everything (green). Untracked days and an untouched today stay plain.
+function dayLevel(data, iso, detail) {
+  if (detail) return detail.done === detail.total ? 4 : Math.max(1, Math.round((4 * detail.done) / detail.total));
+  return data.first && iso >= data.first && iso < data.today ? 0 : null;
+}
+
 function appendDay(year, month, day, data) {
   const iso = isoDay(year, month, day);
   const cell = document.createElement("div");
-  const result = data.days[iso];
-  cell.className = `day ${RESULT_CLASS[result] || ""} ${iso === data.today ? "today" : ""}`;
+  const detail = data.details[iso];
+  const level = dayLevel(data, iso, detail);
+  const used = detail?.jokers.length > 0;
+  cell.className = `day ${level === null ? "" : `lv${level}`} ${used ? "joker-day" : ""} ${iso === data.today ? "today" : ""}`;
   cell.textContent = day;
-  cell.title = RESULT_LABEL[result] || "";
+  if (detail) cell.title = `${detail.done} von ${detail.total}${used ? ` · Joker: ${detail.jokers.join(", ")}` : ""}`;
+  else if (level === 0) cell.title = "Nichts geschafft";
   $("calendar").append(cell);
 }
 
@@ -182,13 +206,10 @@ function moveMonth(step) {
 async function render(status) {
   const checks = Object.values(status.checks);
   const finished = checks.filter((check) => check.done).length;
-  const allDone = finished >= status.required;
+  const allDone = finished === checks.length;
   $("offline").hidden = true;
-  const optional = checks.length - status.required;
-  $("progress").textContent = `${finished} von ${checks.length} erledigt`
-    + (optional > 0 ? ` · ${status.required} genügen` : "");
-  $("title").textContent = title(status, allDone);
-  renderJoker(status.joker, allDone);
+  $("progress").textContent = `${finished} von ${checks.length} erledigt`;
+  $("title").textContent = title(allDone);
   for (const [id, check] of Object.entries(status.checks)) renderTask(id, check);
   renderHistory(status.history, status.day);
   tickTimers();
@@ -226,30 +247,6 @@ async function post(path, body = {}) {
 $("refresh").addEventListener("click", () => refresh(true));
 $("month-prev").addEventListener("click", () => moveMonth(-1));
 $("month-next").addEventListener("click", () => moveMonth(1));
-
-function setJokerFormOpen(open) {
-  jokerFormOpen = open;
-  $("joker-error").hidden = true;
-  $("joker-open").hidden = open;
-  $("joker-form").hidden = !open;
-  if (open) $("joker-reason").focus();
-}
-
-$("joker-open").addEventListener("click", () => setJokerFormOpen(true));
-$("joker-cancel").addEventListener("click", () => setJokerFormOpen(false));
-
-$("joker-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  $("joker-error").hidden = true;
-  try {
-    await post("/joker", { reason: $("joker-reason").value });
-    jokerFormOpen = false;
-    await refresh();
-  } catch (error) {
-    $("joker-error").textContent = error.message;
-    $("joker-error").hidden = false;
-  }
-});
 
 setInterval(tickTimers, 1000);
 setInterval(refresh, POLL_MS);

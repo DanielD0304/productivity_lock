@@ -10,7 +10,7 @@ BASE_URL = f"http://127.0.0.1:{PORT}"
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 SAME_ORIGINS = {f"http://{host}" for host in ALLOWED_HOSTS}
 MAX_BODY_BYTES = 10_000
-TASK_ROUTE = re.compile(r"^/tasks/([a-z0-9_-]+)/(start|finish)$")
+TASK_ROUTE = re.compile(r"^/tasks/([a-z0-9_-]+)/(start|finish|joker)$")
 STATIC_FILES = {
     "/": ("locked.html", "text/html; charset=utf-8"),
     "/locked.js": ("locked.js", "text/javascript; charset=utf-8"),
@@ -106,6 +106,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if task_route and task_route[2] == "start":
                 self._send_json(200, service.start_task(task_route[1]))
+            elif task_route and task_route[2] == "joker":
+                self._send_json(200, service.use_joker(task_route[1], json.loads(raw or b"{}").get("reason")))
             elif task_route:
                 self._send_json(200, service.finish_task(task_route[1], json.loads(raw or b"{}").get("note")))
             elif self.path == "/lernchat/start" and self.server.launcher:
@@ -114,8 +116,6 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/lernchat/stop" and self.server.launcher:
                 self.server.launcher.stop()
                 self._send_json(200, {"stopped": True})
-            elif self.path == "/joker":
-                self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:
                 self._send_json(404, {"error": "Nicht gefunden"})
         except ValueError as error:

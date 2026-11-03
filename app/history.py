@@ -60,4 +60,8 @@ def summarize(days, today_iso):
         "best": best_streak(days, today),
         "week": week_summary(days, today),
         "days": {day: entry["result"] for day, entry in days.items()},
+        # What the calendar colours by: how many tasks were done and which of them only by joker.
+        "details": {day: {"done": entry.get("done", 0), "total": entry.get("total", 0),
+                          "jokers": entry.get("jokers", [])} for day, entry in days.items()},
+        "first": min(days) if days else None,
     }

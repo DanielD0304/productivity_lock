@@ -30,6 +30,14 @@
           <button class="action" type="button" hidden></button>
           <p class="error action-error" hidden></p>
           <p class="timer" hidden></p>
+          <button class="quiet joker-open" type="button" hidden>Joker einsetzen</button>
+          <form class="joker-form" hidden>
+            <label class="joker-label">Warum brauchst du heute den Joker?</label>
+            <input class="joker-reason" type="text" maxlength="200" autocomplete="off">
+            <p class="error joker-error" hidden></p>
+            <button type="submit">Aufgabe erlassen</button>
+            <button class="quiet joker-cancel" type="button">Abbrechen</button>
+          </form>
           <button class="start" type="button" hidden>Timer starten</button>
           <form class="note-form" hidden>
             <label class="note-label"></label>
@@ -49,18 +57,6 @@
 
     <button class="quiet" id="refresh" type="button">Jetzt prüfen</button>
 
-    <section class="joker" id="joker" hidden>
-      <p id="joker-info"></p>
-      <button class="quiet" id="joker-open" type="button" hidden>Joker einsetzen</button>
-      <form id="joker-form" hidden>
-        <label for="joker-reason">Warum brauchst du heute den Joker?</label>
-        <input id="joker-reason" type="text" maxlength="200" autocomplete="off">
-        <p class="error" id="joker-error" hidden></p>
-        <button type="submit">Heute freigeben</button>
-        <button class="quiet" id="joker-cancel" type="button">Abbrechen</button>
-      </form>
-    </section>
-
     <section class="history" id="history" hidden>
       <h2>Verlauf</h2>
       <p class="stats"><strong id="streak"></strong> <span id="best"></span></p>
@@ -72,9 +68,12 @@
       </div>
       <div class="calendar" id="calendar"></div>
       <ul class="legend">
-        <li><span class="swatch done"></span>Geschafft</li>
-        <li><span class="swatch joker-day"></span>Joker</li>
-        <li><span class="swatch partial"></span>Teilweise</li>
+        <li><span class="swatch lv0"></span>Nichts</li>
+        <li><span class="swatch lv1"></span>Wenig</li>
+        <li><span class="swatch lv2"></span>Die Hälfte</li>
+        <li><span class="swatch lv3"></span>Fast alles</li>
+        <li><span class="swatch lv4"></span>Alles</li>
+        <li><span class="swatch joker-day"></span>Mit Joker</li>
       </ul>
     </section>
   </main>

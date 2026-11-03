@@ -360,14 +360,6 @@ class HistoryRecordingTest(ServiceBase):
         self.read_fully()
         self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "done"})
 
-    def test_joker_is_recorded_and_finishing_upgrades_it(self):
-        self.service.use_joker("krank")
-        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "joker"})
-        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
-        self.service.status()
-        self.read_fully()
-        self.assertEqual(self.service.status()["history"]["days"], {"2026-10-31": "done"})
-
     def test_history_survives_new_day_and_restart(self):
         self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
         self.service.status()
@@ -573,48 +565,6 @@ class LernchatTest(ServiceBase):
         self.assertNotIn("lernchat", [task["id"] for task in build_tasks(CONFIG)])
 
 
-class RequiredTasksTest(ServiceBase):
-    def setUp(self):
-        super().setUp()
-        self.config = {**CONFIG, "required_tasks": 3,
-                       "custom_tasks": [{"id": "sport", "title": "Sport", "type": "check"}]}
-        self.service = LockService(self.config, self.dir, clock=self.clock,
-                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
-
-    def status(self):
-        return self.service.status(network=False)
-
-    def test_three_of_four_unlock(self):
-        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
-        self.service.status()
-        self.assertFalse(self.status()["unlocked"])
-        self.read_fully()
-        status = self.status()
-        self.assertTrue(status["unlocked"])
-        self.assertEqual(status["required"], 3)
-        self.assertFalse(status["checks"]["sport"]["done"])
-
-    def test_two_of_four_stay_locked(self):
-        self.anki = {"done": True, "detail": "ok", "error": None}
-        self.read_fully()
-        self.assertFalse(self.status()["unlocked"])
-
-    def test_day_with_three_counts_as_done_in_history(self):
-        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
-        self.service.status()
-        self.read_fully()
-        self.status()
-        self.assertEqual(self.status()["history"]["days"][self.status()["day"]], "done")
-
-    def test_without_setting_everything_is_needed(self):
-        self.service = LockService(CONFIG, self.dir, clock=self.clock,
-                                   anki_check=lambda now: {"done": True, "detail": "ok", "error": None},
-                                   leetcode_check=self.fake_leetcode)
-        self.read_fully()
-        self.assertFalse(self.status()["unlocked"])
-        self.assertEqual(self.status()["required"], 3)
-
-
 class LauncherTest(unittest.TestCase):
     def setUp(self):
         self.calls = []
@@ -701,12 +651,11 @@ class GitHubParseTest(unittest.TestCase):
 
 class TrayTest(unittest.TestCase):
     @staticmethod
-    def status(anki=True, reading=False, joker=False):
+    def status(anki=True, reading=False):
         return {
             "day": "2026-10-31",
-            "unlocked": joker or (anki and reading),
+            "unlocked": anki and reading,
             "checks": {"anki": {"title": "Anki", "done": anki}, "reading": {"title": "Lesen", "done": reading}},
-            "joker": {"active": joker},
             "history": {"streak": 4},
         }
 
@@ -714,8 +663,6 @@ class TrayTest(unittest.TestCase):
         self.assertEqual(tray.open_tasks(self.status()), ["Lesen"])
         self.assertEqual(tray.tooltip(self.status()), "Productivity Lock: 1 von 2 erledigt · Serie 4")
         self.assertEqual(tray.icon_label(self.status()), "1")
-        self.assertEqual(tray.icon_label(self.status(joker=True)), "J")
-        self.assertIn("Joker aktiv", tray.tooltip(self.status(joker=True)))
 
     def test_icon_can_be_drawn(self):
         self.assertEqual(tray.draw_icon(self.status()).size, (tray.ICON_SIZE, tray.ICON_SIZE))
@@ -765,66 +712,110 @@ class JokerTest(ServiceBase):
     def at(self, *moment):
         self.clock.value = dt.datetime(*moment).timestamp()
 
-    def test_joker_unlocks_only_today(self):
-        self.service.use_joker("krank")
+    def check(self, task="anki"):
+        return self.service.status(network=False)["checks"][task]
+
+    def finish_others(self, *skip):
+        done = {"done": True, "detail": "ok", "error": None}
+        if "anki" not in skip:
+            self.anki = done
+        if "leetcode" not in skip:
+            self.leetcode = done
+        self.service.status()
+        if "reading" not in skip:
+            self.read_fully()
+
+    def test_joker_excuses_only_that_task_and_only_today(self):
+        self.finish_others("anki")
+        self.assertFalse(self.service.status()["unlocked"])
+        self.service.use_joker("anki", "krank")
         status = self.service.status()
         self.assertTrue(status["unlocked"])
-        self.assertEqual(status["joker"]["reason"], "krank")
+        self.assertTrue(status["checks"]["anki"]["done"])
+        self.assertTrue(status["checks"]["anki"]["joker_used"])
+        self.assertEqual(status["checks"]["anki"]["detail"], "Joker: krank")
         self.at(2026, 11, 1, 3, 59)
         self.assertTrue(self.service.status()["unlocked"])
         self.at(2026, 11, 1, 4, 0)
-        self.assertFalse(self.service.status()["unlocked"])
+        self.assertFalse(self.check()["done"])
 
-    def test_second_joker_in_same_week_is_refused(self):
-        self.service.use_joker("krank")
+    def test_one_joker_does_not_excuse_other_tasks(self):
+        self.service.use_joker("anki", "krank")
+        status = self.service.status()
+        self.assertFalse(status["unlocked"])
+        self.assertFalse(status["checks"]["leetcode"]["done"])
+
+    def test_each_task_has_its_own_joker_per_week(self):
+        self.service.use_joker("anki", "krank")
         self.at(2026, 11, 1, 12, 0)
-        self.assertEqual(self.service.status()["joker"]["left"], 0)
+        self.assertEqual(self.check("anki")["joker"]["left"], 0)
+        self.assertEqual(self.check("leetcode")["joker"]["left"], 1)
         with self.assertRaisesRegex(ValueError, "verbraucht"):
-            self.service.use_joker("nochmal")
-        self.assertFalse(self.service.status()["unlocked"])
+            self.service.use_joker("anki", "nochmal")
+        self.service.use_joker("leetcode", "Reise")
+        self.assertTrue(self.check("leetcode")["done"])
 
-    def test_new_week_brings_new_joker_at_rollover(self):
-        self.service.use_joker("krank")
+    def test_new_week_brings_new_jokers_at_rollover(self):
+        self.service.use_joker("anki", "krank")
         self.at(2026, 11, 2, 3, 59)
-        self.assertEqual(self.service.status()["joker"]["left"], 0)
+        self.assertEqual(self.check()["joker"]["left"], 0)
         self.at(2026, 11, 2, 4, 0)
-        self.assertEqual(self.service.status()["joker"]["left"], 1)
-        self.service.use_joker("Klausur")
-        self.assertTrue(self.service.status()["unlocked"])
+        self.assertEqual(self.check()["joker"]["left"], 1)
+        self.service.use_joker("anki", "Klausur")
+        self.assertTrue(self.check()["done"])
 
     def test_using_it_twice_today_costs_one(self):
-        self.service.use_joker("krank")
-        self.service.use_joker("anders")
-        status = self.service.status()["joker"]
-        self.assertEqual(status["reason"], "krank")
-        self.assertEqual(status["left"], 0)
+        self.service.use_joker("anki", "krank")
+        self.service.use_joker("anki", "anders")
+        joker = self.check()["joker"]
+        self.assertEqual(joker["reason"], "krank")
+        self.assertEqual(joker["left"], 0)
 
     def test_reason_is_required(self):
         with self.assertRaisesRegex(ValueError, "warum"):
-            self.service.use_joker("  a  ")
-        self.assertEqual(self.service.status()["joker"]["left"], 1)
+            self.service.use_joker("anki", "  a  ")
+        self.assertEqual(self.check()["joker"]["left"], 1)
 
-    def test_joker_is_not_spent_when_everything_is_done(self):
-        self.anki = self.leetcode = {"done": True, "detail": "ok", "error": None}
+    def test_joker_is_not_spent_on_a_finished_task(self):
+        self.anki = {"done": True, "detail": "ok", "error": None}
         self.service.status()
-        self.read_fully()
         with self.assertRaisesRegex(ValueError, "erledigt"):
-            self.service.use_joker("krank")
-        self.assertEqual(self.service.status()["joker"]["left"], 1)
+            self.service.use_joker("anki", "krank")
+        self.assertEqual(self.check()["joker"]["left"], 1)
+
+    def test_unknown_task_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "Unbekannt"):
+            self.service.use_joker("nope", "krank")
 
     def test_used_joker_survives_restart(self):
-        self.service.use_joker("krank")
+        self.service.use_joker("anki", "krank")
         self.at(2026, 11, 1, 12, 0)
         self.service.status()
-        self.assertEqual(self.make_service().status()["joker"]["left"], 0)
+        self.assertEqual(self.make_service().status()["checks"]["anki"]["joker"]["left"], 0)
 
-    def test_state_file_from_before_jokers_still_works(self):
+    def test_state_file_from_before_task_jokers_still_works(self):
         with open(os.path.join(self.dir, "state.json"), "w", encoding="utf-8") as file:
-            json.dump({"day": "2026-10-31", "done": {}, "reading": {}}, file)
+            json.dump({"day": "2026-10-31", "done": {}, "jokers": [{"day": "2026-10-30", "reason": "alt"}]}, file)
         service = self.make_service()
-        self.assertEqual(service.status()["joker"]["left"], 1)
-        service.use_joker("krank")
-        self.assertTrue(service.status()["unlocked"])
+        self.assertEqual(service.status()["checks"]["anki"]["joker"]["left"], 1)
+        service.use_joker("anki", "krank")
+        self.assertTrue(service.status()["checks"]["anki"]["done"])
+
+    def test_day_with_jokers_is_recorded_with_them(self):
+        self.finish_others("anki")
+        self.service.use_joker("anki", "krank")
+        self.service.status()
+        entry = self.service.state["history"]["2026-10-31"]
+        self.assertEqual((entry["result"], entry["done"], entry["jokers"]), ("done", 3, ["Anki"]))
+        details = self.service.status()["history"]["details"]["2026-10-31"]
+        self.assertEqual(details, {"done": 3, "total": 3, "jokers": ["Anki"]})
+
+    def test_day_with_only_jokers_does_not_count_for_the_streak(self):
+        for task in ("anki", "leetcode", "reading"):
+            self.service.use_joker(task, "frei")
+        days = self.service.status()["history"]
+        self.assertEqual(days["days"], {"2026-10-31": "joker"})
+        self.assertEqual(days["streak"], 0)
 
 
 class EnforcerTest(unittest.TestCase):
@@ -960,15 +951,17 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.service.status()["checks"]["reading"]["state"], "idle")
 
     def test_joker_endpoint(self):
-        self.assertEqual(self.request("/joker", method="POST", body={"reason": "x"})[0], 400)
-        code, body, _ = self.request("/joker", method="POST", body={"reason": "krank"})
+        self.assertEqual(self.request("/tasks/anki/joker", method="POST", body={"reason": "x"})[0], 400)
+        self.assertEqual(self.request("/tasks/nope/joker", method="POST", body={"reason": "krank"})[0], 400)
+        code, body, _ = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"})
         self.assertEqual(code, 200)
         self.assertTrue(json.loads(body)["active"])
 
     def test_foreign_website_cannot_use_joker(self):
-        code, _, _ = self.request("/joker", method="POST", body={"reason": "krank"}, origin="https://evil.example")
+        code, _, _ = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"},
+                                  origin="https://evil.example")
         self.assertEqual(code, 403)
-        self.assertFalse(self.service.status()["joker"]["active"])
+        self.assertFalse(self.service.status()["checks"]["anki"]["joker"]["active"])
 
     def test_lernchat_start_launches_once_per_request(self):
         self.assertEqual(self.request("/lernchat/start", method="POST", body={})[0], 200)

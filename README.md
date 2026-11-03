@@ -30,12 +30,10 @@ Abschalten: `powershell -ExecutionPolicy Bypass -File .\uninstall_autostart.ps1`
 | LeetCode | Mindestens eine akzeptierte Lösung seit 4 Uhr |
 | Lesen | 20-Minuten-Timer abgelaufen und ein Satz dazu (mindestens 20 Zeichen) |
 
-Von den vier Aufgaben (Anki, LeetCode, Lesen, Lernchat) genügen drei pro Tag, eingestellt mit `required_tasks` in
-`config.json`. Fehlt der Wert, müssen alle erledigt sein. Ein Tag mit drei erledigten Aufgaben zählt für die Serie.
-
-Für schlechte Tage gibt es einen Joker pro Kalenderwoche (`joker.per_week`): Du setzt ihn auf der Checkliste mit einer
-kurzen Begründung ein, und alles ist bis zum nächsten Tag um 4 Uhr frei. Die Woche beginnt montags um 4 Uhr, nicht
-genutzte Joker verfallen.
+Es müssen alle Aufgaben erledigt sein. Für schlechte Tage hat **jede Aufgabe einen eigenen Joker pro Kalenderwoche**
+(`joker.per_week`): Du setzt ihn an der Aufgabe mit einer kurzen Begründung ein, und sie gilt für heute als erledigt, bis
+zum nächsten Tag um 4 Uhr. Dieselbe Aufgabe kannst du in einer Woche nur einmal erlassen, damit keine Gewohnheit
+wegfällt. Die Woche beginnt montags um 4 Uhr, nicht genutzte Joker verfallen.
 
 Bei Anki zählen nur die Decks unter `Sprachen` und `Essential Spanish Vocabulary Top 5000`. `Archiv`, `Master` und
 `Poker` zählen nicht und blockieren auch nicht. Jede Antwort zählt, auch bei derselben Karte; Antworten unter einer Sekunde zählen nicht als Karte.
@@ -92,11 +90,13 @@ nur sich. Ohne `lernchat` in der Config gibt es die Aufgabe nicht.
 
 ## Verlauf und Tray-Symbol
 
-Die Checkliste zeigt deine Serie, den Rekord, die Wochenbilanz und einen Kalender. Nur komplett geschaffte Tage zählen
-für die Serie. Ein Joker-Tag zählt nicht mit, unterbricht sie aber auch nicht. Der Verlauf beginnt mit dem ersten Tag,
-an dem du etwas erledigt hast.
+Die Checkliste zeigt deine Serie, den Rekord, die Wochenbilanz und einen Kalender. Der Kalender färbt jeden Tag nach den
+erledigten Aufgaben: rot für nichts, grün für alles, dazwischen Orange, Gelb und Hellgrün. Ein gestrichelter Rand
+markiert Tage, an denen ein Joker benutzt wurde. Nur komplett geschaffte Tage zählen für die Serie, auch wenn eine
+Aufgabe per Joker erlassen wurde. Ein Tag, an dem *alle* Aufgaben per Joker erlassen wurden, zählt nicht mit, unterbricht
+die Serie aber auch nicht. Der Verlauf beginnt mit dem ersten Tag, an dem du etwas erledigt hast.
 
-Das Symbol neben der Uhr zeigt, wie viele Aufgaben erledigt sind: rot gesperrt, grün frei, `J` bei aktivem Joker. Ein
+Das Symbol neben der Uhr zeigt, wie viele Aufgaben erledigt sind: rot gesperrt, grün frei. Ein
 Klick öffnet die Checkliste. Zu den Zeiten in `reminders` erinnert es dich an alles, was noch offen ist. Die Zeiten
 stehen im Format `HH:MM`.
 

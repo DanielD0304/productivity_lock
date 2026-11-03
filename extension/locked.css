@@ -163,16 +163,20 @@ button.nav:disabled { color: var(--line); cursor: default; }
   color: var(--muted);
 }
 
-.day.done, .swatch.done { background: var(--accent); color: var(--accent-text); font-weight: 600; }
-.day.joker-day, .swatch.joker-day { border: 1px dashed var(--accent); color: var(--text); }
-.day.partial, .swatch.partial { background: var(--line); color: var(--text); }
+.lv0 { background: #a8321f; color: #fff; }
+.lv1 { background: #c8631f; color: #fff; }
+.lv2 { background: #c9a227; color: #1d1d1b; }
+.lv3 { background: #7fa34a; color: #10200a; }
+.lv4 { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.day.joker-day, .swatch.joker-day { border: 2px dashed var(--text); }
+.swatch.joker-day { background: transparent; }
 .day.today { outline: 2px solid var(--text); outline-offset: 1px; }
 
 .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 12px; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; }
 
-.joker { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-.joker button.quiet { display: block; margin-top: 4px; }
-#joker-form button { margin-right: 12px; }
-#joker-form button.quiet { display: inline-block; }
+.task .joker-form { margin-top: 8px; }
+.task .joker-form button { margin-right: 12px; }
+.task .joker-form button.quiet { display: inline-block; }
+.task.excused .task-title::after { content: " · Joker"; color: var(--muted); font-weight: 400; font-size: 14px; }

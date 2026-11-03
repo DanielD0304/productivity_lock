@@ -21,13 +21,10 @@ def progress_text(status):
 
 
 def tooltip(status):
-    state = "Joker aktiv" if status["joker"]["active"] else progress_text(status)
-    return f"Productivity Lock: {state} · Serie {status['history']['streak']}"
+    return f"Productivity Lock: {progress_text(status)} · Serie {status['history']['streak']}"
 
 
 def icon_label(status):
-    if status["joker"]["active"]:
-        return "J"
     return str(len(status["checks"]) - len(open_tasks(status)))
 
 

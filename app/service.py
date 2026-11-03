@@ -196,6 +196,10 @@ class LockService:
             result = self._lernchat_status(today)
         else:
             result = self._timer_status(task, today)
+        joker = self._joker_status(task["id"], today)
+        excused = not result["done"] and joker["active"]
+        if excused:
+            result = {**result, "done": True, "detail": f"Joker: {joker['reason']}"}
         return {
             **result,
             "title": task["title"],
@@ -205,12 +209,15 @@ class LockService:
             "link_text": task.get("link_text"),
             "action_path": task.get("action_path"),
             "action_text": task.get("action_text"),
+            "joker": joker,
+            "joker_used": excused,
         }
 
-    def _joker_status(self, today):
+    def _joker_status(self, task_id, today):
+        """One joker per task and calendar week; it excuses that task for the day it is set."""
         allowed = self.config["joker"]["per_week"]
         week = _calendar_week(today["day"])
-        used = [j for j in today.get("jokers", []) if _calendar_week(j["day"]) == week]
+        used = [j for j in today.get("jokers", []) if j.get("task") == task_id and _calendar_week(j["day"]) == week]
         current = next((j for j in used if j["day"] == today["day"]), None)
         return {
             "active": current is not None,
@@ -219,21 +226,16 @@ class LockService:
             "per_week": allowed,
         }
 
-    def _required(self, items):
-        """How many tasks unlock the day: `required_tasks`, or all of them when it is not set."""
-        return min(self.config.get("required_tasks", len(items)), len(items))
-
-    def _record_history(self, today, items, joker):
+    def _record_history(self, today, items):
         finished = sum(item["done"] for item in items.values())
-        if finished >= self._required(items):
-            result = "done"
-        elif joker["active"]:
-            result = "joker"
+        jokers = [item["title"] for item in items.values() if item["joker_used"]]
+        if finished == len(items):
+            result = "joker" if len(jokers) == len(items) else "done"
         elif finished:
             result = "partial"
         else:
             return
-        entry = {"result": result, "done": finished, "total": len(items)}
+        entry = {"result": result, "done": finished, "total": len(items), "jokers": jokers}
         days = today.setdefault("history", {})
         if days.get(today["day"]) != entry:
             days[today["day"]] = entry
@@ -247,36 +249,34 @@ class LockService:
         with self.lock:
             today = self._today()
             items = {task["id"]: self._task_status(task, today) for task in self.tasks}
-            joker = self._joker_status(today)
-            finished = sum(item["done"] for item in items.values())
-            required = self._required(items)
-            self._record_history(today, items, joker)
+            self._record_history(today, items)
             return {
                 "day": today["day"],
-                "unlocked": joker["active"] or finished >= required,
-                "required": required,
+                "unlocked": all(item["done"] for item in items.values()),
                 "checks": items,
-                "joker": joker,
                 "history": history.summarize(today.get("history", {}), today["day"]),
             }
 
-    def use_joker(self, reason):
+    def use_joker(self, task_id, reason):
         reason = " ".join((reason or "").split())
         with self.lock:
             status = self.status(network=False)
-            joker = status["joker"]
+            item = status["checks"].get(task_id)
+            if item is None:
+                raise ValueError("Unbekannte Aufgabe")
+            joker = item["joker"]
             if joker["active"]:
                 return joker
-            if status["unlocked"]:
-                raise ValueError("Heute ist schon alles erledigt")
+            if item["done"]:
+                raise ValueError("Diese Aufgabe ist heute schon erledigt")
             if joker["left"] == 0:
-                raise ValueError("Der Joker für diese Woche ist schon verbraucht")
+                raise ValueError("Der Joker dieser Aufgabe ist für diese Woche schon verbraucht")
             if len(reason) < JOKER_MIN_REASON_CHARS:
                 raise ValueError("Schreib bitte kurz dazu, warum du den Joker brauchst")
             today = self._today()
-            today.setdefault("jokers", []).append({"day": today["day"], "reason": reason})
+            today.setdefault("jokers", []).append({"day": today["day"], "task": task_id, "reason": reason})
             self._save_state()
-            return self._joker_status(today)
+            return self._joker_status(task_id, today)
 
     def _timer_task(self, task_id):
         for task in self.tasks:
