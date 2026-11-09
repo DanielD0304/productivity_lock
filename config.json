@@ -19,7 +19,8 @@
   },
   "lernchat": {
     "per_week": 5,
-    "min_score": 0.7
+    "min_score": 0.7,
+    "core_lectures": 6
   },
   "sprachchat": {
     "per_week": 5,

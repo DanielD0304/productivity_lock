@@ -42,6 +42,28 @@ def print_languages(entries, languages, now):
         print_weak_points(entries, now, code, f" {name}")
 
 
+def print_lectures(entries, settings):
+    lectures = chats.lecture_progress(entries, settings["min_score"])
+    if lectures:
+        print("Stand je Vorlesung:")
+        for number, lecture in lectures.items():
+            state = "gefestigt" if lecture["solid"] else "erarbeitet" if lecture["learned"] else "angefangen"
+            print(f"- VL{number:02d}: {state}, bester Score {lecture['best']:.2f}")
+    else:
+        print("Stand je Vorlesung: noch keine")
+    simulation = chats.simulation_status(entries, settings["min_score"], settings.get("core_lectures", 6))
+    if simulation["ready"]:
+        print(f"Prüfungssimulation: bereit ({simulation['simulations']} bisher, "
+              f"letzte vor {simulation['since_last']} Chats)")
+    else:
+        reasons = []
+        if simulation["missing"]:
+            reasons.append("noch nicht gefestigt: " + ", ".join(f"VL{n:02d}" for n in simulation["missing"]))
+        if simulation["weak"] > chats.MAX_WEAK_FOR_SIMULATION:
+            reasons.append(f"{simulation['weak']} offene Schwächen")
+        print("Prüfungssimulation: noch nicht (" + "; ".join(reasons) + ")")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("chat", choices=sorted(chats.CHATS))
@@ -86,6 +108,7 @@ def main():
     if languages:
         print_languages(entries, languages, now)
     else:
+        print_lectures(entries, settings)
         print_weak_points(entries, now)
 
 

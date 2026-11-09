@@ -64,9 +64,11 @@ Zwei Aufgaben, jede fünfmal pro Woche ein kurzer Chat mit Claude. Du startest s
 Checkliste. Er öffnet Claude Code in einem eigenen Fenster mit dem passenden Skill (Pfad zur `claude.exe` bei Bedarf in
 `claude_path` in der `config.json`).
 
-- **Lernchat** (`/lernchat`): Quiz oder Feynman (du erklärst) zur nächsten Prüfung. Der Skill sucht über deine
-  Lernmeister-Profile (`~/Lernmeister/<Fach>/`) das Fach mit der nächsten Prüfung und das Thema, das laut Lernplan dran
-  ist.
+- **Lernchat** (`/lernchat`): zur nächsten Prüfung, mit dem Fach aus deinen Lernmeister-Profilen
+  (`~/Lernmeister/<Fach>/`). Jede Vorlesung wird erst **erarbeitet** (Claude erklärt sie wie ein Tutor mit
+  Verständnisfragen), dann **gefestigt** (du erklärst sie selbst oder machst ein Quiz, bis mindestens 0,85). Sind die
+  Kernvorlesungen (`core_lectures`, hier 1 bis 6) gefestigt und höchstens zwei Schwächen offen, streut der Chat
+  20-minütige **Prüfungssimulationen** im Stil der Prüfungsprotokolle ein.
 - **Sprachchat** (`/sprachchat`): Englisch, Spanisch oder Chinesisch, du wählst am Anfang. Pro Sprache gibt es zuerst
   eine **Sprachevaluation** (Niveau nach GER, bei Chinesisch auch HSK). Danach lernt der Chat schrittweise auf diesem
   Niveau: erst die offenen Schwächen, dann neues Material, dann Anwenden. Nach drei starken Chats hebt er das Niveau an.
@@ -83,6 +85,7 @@ Einstellungen in `config.json` unter `lernchat` und `sprachchat`:
 | `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (je 5) |
 | `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
 | `languages` | Nur Sprachchat: Sprachcode und Name der wählbaren Sprachen |
+| `core_lectures` | Nur Lernchat: so viele Vorlesungen müssen gefestigt sein, bevor Simulationen kommen (6) |
 
 Liegt der Score unter `min_score`, ist die Aufgabe heute offen, auch an einem freien Tag, bis eine Wiederholungsrunde
 besteht. Läuft ein Chat, wird aus dem Knopf „… beenden“, der das Fenster schließt. Nach einem Chat mit zählendem Score

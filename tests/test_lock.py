@@ -612,6 +612,42 @@ class SprachchatTest(ServiceBase):
         self.assertIn("Sprachchat", item["detail"])
 
 
+class LectureProgressTest(unittest.TestCase):
+    @staticmethod
+    def entry(minute, mode, topic, score, weak=()):
+        entry = chats.log_entry(dt.datetime(2026, 11, 2, 12, minute), "SML", mode, topic, score, weak)
+        entry["at"] = dt.datetime.fromisoformat(entry["at"])
+        return entry
+
+    def test_stages_per_lecture(self):
+        entries = [self.entry(1, "lernen", "VL01 Einführung", 0.8),
+                   self.entry(2, "quiz", "VL01 Quiz", 0.9),
+                   self.entry(3, "lernen", "VL2 Zufallszahlen", 0.75),
+                   self.entry(4, "feynman", "VL03 Monte Carlo", 0.4),
+                   self.entry(5, "quiz", "Schwächen VL02/VL03", 0.8)]
+        lectures = chats.lecture_progress(entries, 0.7)
+        self.assertEqual({n: (l["learned"], l["solid"]) for n, l in lectures.items()},
+                         {1: (True, True), 2: (True, False), 3: (True, False)})
+
+    def test_a_passed_lernen_round_does_not_make_it_solid(self):
+        lectures = chats.lecture_progress([self.entry(1, "lernen", "VL01", 0.95)], 0.7)
+        self.assertFalse(lectures[1]["solid"])
+
+    def test_simulation_waits_for_core_lectures_and_few_weak_points(self):
+        entries = [self.entry(n, "quiz", f"VL0{n}", 0.9) for n in range(1, 3)]
+        status = chats.simulation_status(entries, 0.7, 3)
+        self.assertEqual((status["ready"], status["missing"]), (False, [3]))
+        entries.append(self.entry(3, "feynman", "VL03", 0.9, weak=["a", "b", "c"]))
+        self.assertFalse(chats.simulation_status(entries, 0.7, 3)["ready"])
+        entries.append(self.entry(4, "quiz", "VL03", 0.9))
+        entries[-1]["fixed"] = ["a"]
+        status = chats.simulation_status(entries, 0.7, 3)
+        self.assertTrue(status["ready"])
+        self.assertEqual(status["since_last"], 4)
+        entries.append(self.entry(5, "simulation", "Simulation VL01-VL03", 0.8))
+        self.assertEqual(chats.simulation_status(entries, 0.7, 3)["since_last"], 0)
+
+
 class LauncherTest(unittest.TestCase):
     def setUp(self):
         self.calls = []

@@ -2,6 +2,7 @@
 import datetime as dt
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -12,7 +13,7 @@ from . import checks
 WEEK_DAYS = 7
 # id -> checklist title, Claude Code skill the button opens, and the modes a session can have.
 CHATS = {
-    "lernchat": {"title": "Lernchat", "skill": "/lernchat", "modes": ("quiz", "feynman")},
+    "lernchat": {"title": "Lernchat", "skill": "/lernchat", "modes": ("lernen", "quiz", "feynman", "simulation")},
     "sprachchat": {"title": "Sprachchat", "skill": "/sprachchat", "modes": ("evaluation", "lernen", "gespraech")},
 }
 
@@ -50,6 +51,41 @@ def read_entries(path):
         except (ValueError, KeyError, TypeError):
             continue
     return sorted(entries, key=lambda entry: entry["at"])
+
+
+LECTURE = re.compile(r"\bVL ?0*(\d{1,2})\b", re.IGNORECASE)
+SOLID_SCORE = 0.85
+MAX_WEAK_FOR_SIMULATION = 2
+
+
+def lecture_progress(entries, min_score):
+    """Per lecture number named in a topic (e.g. "VL03 ..."): learned once a session passed,
+    solid once a quiz, Feynman round or simulation reached SOLID_SCORE."""
+    lectures = {}
+    for entry in entries:
+        score = float(entry["score"])
+        for number in {int(match) for match in LECTURE.findall(entry.get("topic", ""))}:
+            lecture = lectures.setdefault(number, {"learned": False, "solid": False, "best": 0.0})
+            lecture["best"] = max(lecture["best"], score)
+            lecture["learned"] = lecture["learned"] or score >= min_score
+            if entry["mode"] in ("quiz", "feynman", "simulation") and score >= SOLID_SCORE:
+                lecture["solid"] = True
+    return dict(sorted(lectures.items()))
+
+
+def simulation_status(entries, min_score, core_lectures):
+    """Exam simulations start once every core lecture is solid and hardly any weak point is open."""
+    lectures = lecture_progress(entries, min_score)
+    missing = [n for n in range(1, core_lectures + 1) if not lectures.get(n, {}).get("solid")]
+    weak = len(open_weak_points(entries))
+    since = 0
+    for entry in reversed(entries):
+        if entry["mode"] == "simulation":
+            break
+        since += 1
+    ready = not missing and weak <= MAX_WEAK_FOR_SIMULATION
+    return {"ready": ready, "missing": missing, "weak": weak,
+            "simulations": sum(entry["mode"] == "simulation" for entry in entries), "since_last": since}
 
 
 def latest_levels(entries):
