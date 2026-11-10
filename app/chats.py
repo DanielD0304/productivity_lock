@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import threading
 import time
+import urllib.parse
 
 from . import checks
 
@@ -163,6 +164,30 @@ def find_claude(configured=None):
     home_install = os.path.join(os.path.expanduser("~"), ".local", "bin", "claude.exe")
     candidates = [configured, shutil.which("claude"), home_install]
     return next((path for path in candidates if path and os.path.isfile(path)), None)
+
+
+class DesktopLauncher:
+    """Opens a new Claude Code session in the Claude desktop app with the skill prefilled.
+
+    The app asks once to confirm the folder and waits for Enter; it cannot be watched or closed from here.
+    """
+
+    def __init__(self, project_dir, skill, opener=None):
+        self.url = "claude://code/new?" + urllib.parse.urlencode({"q": skill, "folder": project_dir},
+                                                                 quote_via=urllib.parse.quote)
+        self.opener = opener or os.startfile
+
+    def running(self):
+        return False
+
+    def start(self):
+        try:
+            self.opener(self.url)
+        except OSError as error:
+            raise ValueError(f"Die Claude-App ließ sich nicht öffnen: {error}") from error
+
+    def stop(self):
+        raise ValueError("Ein Chat in der Claude-App wird dort geschlossen")
 
 
 def kill_tree(pid):

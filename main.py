@@ -7,7 +7,7 @@ import threading
 import time
 
 from app.enforcer import Enforcer, run_loop
-from app.chats import CHATS, Launcher
+from app.chats import CHATS, DesktopLauncher, Launcher
 from app.server import BASE_URL, LockServer
 from app.service import LockService
 from app.tray import run_tray
@@ -34,12 +34,16 @@ def main():
 
     service = LockService(config, args.data_dir)
     enforcer = Enforcer(config["blocked_processes"], config["game_process"])
-    launchers = {
-        chat_id: Launcher(ROOT, chat["skill"], config.get("claude_path"),
-                          os.path.join(args.data_dir, f"{chat_id}.jsonl"), config[chat_id].get("min_score", 0.7),
-                          model=config.get("chat_model"))
-        for chat_id, chat in CHATS.items() if config.get(chat_id)
-    }
+
+    def make_launcher(chat_id, chat):
+        # "desktop" opens the Claude app (readable formatting); "terminal" runs claude.exe in a console window.
+        if config.get("chat_app", "desktop") == "desktop":
+            return DesktopLauncher(ROOT, chat["skill"])
+        return Launcher(ROOT, chat["skill"], config.get("claude_path"),
+                        os.path.join(args.data_dir, f"{chat_id}.jsonl"), config[chat_id].get("min_score", 0),
+                        model=config.get("chat_model"))
+
+    launchers = {chat_id: make_launcher(chat_id, chat) for chat_id, chat in CHATS.items() if config.get(chat_id)}
     server = LockServer(service, os.path.join(ROOT, "extension"), launchers=launchers)
     threading.Thread(
         target=run_loop,

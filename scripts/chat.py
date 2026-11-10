@@ -43,7 +43,8 @@ def print_languages(entries, languages, now):
 
 
 def print_lectures(entries, settings):
-    lectures = chats.lecture_progress(entries, settings["min_score"])
+    learned = settings.get("learned_score", 0.7)
+    lectures = chats.lecture_progress(entries, learned)
     if lectures:
         print("Stand je Vorlesung:")
         for number, lecture in lectures.items():
@@ -51,7 +52,7 @@ def print_lectures(entries, settings):
             print(f"- VL{number:02d}: {state}, bester Score {lecture['best']:.2f}")
     else:
         print("Stand je Vorlesung: noch keine")
-    simulation = chats.simulation_status(entries, settings["min_score"], settings.get("core_lectures", 6))
+    simulation = chats.simulation_status(entries, learned, settings.get("core_lectures", 6))
     if simulation["ready"]:
         print(f"Prüfungssimulation: bereit ({simulation['simulations']} bisher, "
               f"letzte vor {simulation['since_last']} Chats)")
@@ -95,8 +96,10 @@ def main():
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as file:
             file.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        counted = "zählt" if args.score >= settings["min_score"] else f"zählt nicht (unter {settings['min_score']:.0%})"
-        print(f"Eingetragen, {counted}.")
+        if args.score >= settings["min_score"]:
+            print("Eingetragen, zählt für heute.")
+        else:
+            print(f"Eingetragen, zählt nicht (unter {settings['min_score']:.0%}).")
 
     now = dt.datetime.now()
     today = checks.logical_date(now, rollover)

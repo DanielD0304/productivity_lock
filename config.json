@@ -17,15 +17,16 @@
   "joker": {
     "per_week": 1
   },
+  "chat_app": "desktop",
   "chat_model": "sonnet",
   "lernchat": {
     "per_week": 5,
-    "min_score": 0.7,
+    "min_score": 0,
     "core_lectures": 6
   },
   "sprachchat": {
     "per_week": 5,
-    "min_score": 0.7,
+    "min_score": 0,
     "languages": {
       "en": "Englisch",
       "es": "Spanisch",

@@ -61,9 +61,13 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 ## Lernchat und Sprachchat
 
 Zwei Aufgaben, jede fünfmal pro Woche ein kurzer Chat mit Claude. Du startest sie mit dem Knopf an der Aufgabe auf der
-Checkliste. Er öffnet Claude Code in einem eigenen Fenster mit dem passenden Skill (Pfad zur `claude.exe` bei Bedarf in
-`claude_path` in der `config.json`). Die Chats laufen mit dem Modell aus `chat_model` (Sonnet), das schont das
-Nutzungslimit deines Abos.
+Checkliste. Er öffnet in der Claude-App eine neue Code-Sitzung im Projektordner, mit `/lernchat` bzw. `/sprachchat`
+schon im Eingabefeld. Die App fragt jedes Mal kurz, ob sie den Ordner nutzen darf, danach drückst du Enter. Die Skills
+laufen mit Sonnet (`model: sonnet` im Skill), das schont das Nutzungslimit deines Abos.
+
+Mit `"chat_app": "terminal"` in der `config.json` startet der Knopf stattdessen `claude.exe` in einem Konsolenfenster
+(Modell aus `chat_model`, Pfad bei Bedarf in `claude_path`). Nur dort gibt es „… beenden“ und das automatische Schließen
+nach dem Eintrag.
 
 - **Lernchat** (`/lernchat`): zur nächsten Prüfung, mit dem Fach aus deinen Lernmeister-Profilen
   (`~/Lernmeister/<Fach>/`). Jede Vorlesung wird erst **erarbeitet** (Claude erklärt sie wie ein Tutor mit
@@ -83,15 +87,14 @@ Einstellungen in `config.json` unter `lernchat` und `sprachchat`:
 
 | Wert | Bedeutung |
 | --- | --- |
-| `per_week` | Chats pro Woche, an denen du mindestens `min_score` erreichst (je 5) |
-| `min_score` | Ab diesem Anteil richtiger Antworten zählt ein Chat (0,7) |
+| `per_week` | Chats pro Woche (je 5) |
+| `min_score` | Ab diesem Score zählt ein Chat. 0 heißt: jeder vollständig gemachte Chat zählt (eingestellt) |
 | `languages` | Nur Sprachchat: Sprachcode und Name der wählbaren Sprachen |
 | `core_lectures` | Nur Lernchat: so viele Vorlesungen müssen gefestigt sein, bevor Simulationen kommen (6) |
 
-Liegt der Score unter `min_score`, ist die Aufgabe heute offen, auch an einem freien Tag, bis eine Wiederholungsrunde
-besteht. Läuft ein Chat, wird aus dem Knopf „… beenden“, der das Fenster schließt. Nach einem Chat mit zählendem Score
-schließt es sich etwa 15 Sekunden nach dem Eintrag von selbst. Unter dem Schwellwert bleibt es offen für eine zweite
-Runde.
+Ein Chat zählt, sobald du ihn vollständig gemacht hast. Der Score steuert nur, was wiederholt wird, und ob eine
+Vorlesung als erarbeitet (ab 0,7) oder gefestigt (ab 0,85) gilt. Unter 0,7 bietet Claude eine freiwillige zweite Runde
+zu den Schwächen an.
 
 Pro Tag zählt höchstens ein Chat je Aufgabe. Die Aufgabe sperrt erst, wenn die übrigen Tage der Woche (bis Sonntag) nur
 noch für das Wochenziel reichen, bei 5 pro Woche also ab Mittwoch. An Montag und Dienstag steht sie auf „Heute frei“. Ist

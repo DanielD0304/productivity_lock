@@ -648,6 +648,23 @@ class LectureProgressTest(unittest.TestCase):
         self.assertEqual(chats.simulation_status(entries, 0.7, 3)["since_last"], 0)
 
 
+class DesktopLauncherTest(unittest.TestCase):
+    def test_opens_a_code_session_with_the_skill_and_folder(self):
+        opened = []
+        launcher = chats.DesktopLauncher("C:\\proj dir", "/lernchat", opener=opened.append)
+        launcher.start()
+        self.assertEqual(opened, ["claude://code/new?q=%2Flernchat&folder=C%3A%5Cproj%20dir"])
+        self.assertFalse(launcher.running())
+        with self.assertRaises(ValueError):
+            launcher.stop()
+
+    def test_missing_app_is_explained(self):
+        def fail(url):
+            raise OSError("kein Programm")
+        with self.assertRaisesRegex(ValueError, "Claude-App"):
+            chats.DesktopLauncher("proj", "/lernchat", opener=fail).start()
+
+
 class LauncherTest(unittest.TestCase):
     def setUp(self):
         self.calls = []
