@@ -10,6 +10,7 @@ $shortcut.Arguments = "`"$main`""
 $shortcut.WorkingDirectory = $root
 $shortcut.Save()
 
+# Start through Explorer so the lock does not belong to this shell and survives it closing.
 # A second instance could not bind the port and would exit by itself.
-Start-Process -FilePath $pythonw -ArgumentList "`"$main`"" -WorkingDirectory $root
+Start-Process -FilePath explorer.exe -ArgumentList "`"$shortcutPath`""
 Write-Output "Autostart eingerichtet: $shortcutPath"
