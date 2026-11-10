@@ -62,7 +62,8 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 
 Zwei Aufgaben, jede fünfmal pro Woche ein kurzer Chat mit Claude. Du startest sie mit dem Knopf an der Aufgabe auf der
 Checkliste. Er öffnet Claude Code in einem eigenen Fenster mit dem passenden Skill (Pfad zur `claude.exe` bei Bedarf in
-`claude_path` in der `config.json`).
+`claude_path` in der `config.json`). Die Chats laufen mit dem Modell aus `chat_model` (Sonnet), das schont das
+Nutzungslimit deines Abos.
 
 - **Lernchat** (`/lernchat`): zur nächsten Prüfung, mit dem Fach aus deinen Lernmeister-Profilen
   (`~/Lernmeister/<Fach>/`). Jede Vorlesung wird erst **erarbeitet** (Claude erklärt sie wie ein Tutor mit

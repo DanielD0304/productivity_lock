@@ -176,9 +176,10 @@ class Launcher:
     """
 
     def __init__(self, project_dir, skill="/lernchat", configured=None, log_path=None, min_score=0.7,
-                 grace_seconds=15, popen=subprocess.Popen, kill=kill_tree, sleep=time.sleep):
+                 grace_seconds=15, popen=subprocess.Popen, kill=kill_tree, sleep=time.sleep, model=None):
         self.project_dir = project_dir
         self.skill = skill
+        self.model = model
         self.configured = configured
         self.log_path = log_path
         self.min_score = min_score
@@ -202,7 +203,8 @@ class Launcher:
                                  "claude_path ein")
             flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
             offset = self._log_size()
-            self.process = self.popen([path, self.skill], cwd=self.project_dir, creationflags=flags)
+            command = [path, "--model", self.model, self.skill] if self.model else [path, self.skill]
+            self.process = self.popen(command, cwd=self.project_dir, creationflags=flags)
             if self.log_path:
                 threading.Thread(target=self._close_when_done, args=(self.process, offset), daemon=True).start()
 

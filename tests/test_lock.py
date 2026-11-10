@@ -665,6 +665,10 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(self.calls[0][0], [self.exe, "/sprachchat"])
         self.assertEqual(self.calls[0][1]["cwd"], "proj")
 
+    def test_model_is_passed_to_claude(self):
+        chats.Launcher("proj", "/lernchat", self.exe, popen=self.popen, model="sonnet").start()
+        self.assertEqual(self.calls[0][0], [self.exe, "--model", "sonnet", "/lernchat"])
+
     def test_second_start_is_refused_while_running(self):
         launcher = chats.Launcher("proj", "/lernchat", self.exe, popen=self.popen)
         launcher.start()

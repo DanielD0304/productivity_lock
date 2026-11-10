@@ -36,7 +36,8 @@ def main():
     enforcer = Enforcer(config["blocked_processes"], config["game_process"])
     launchers = {
         chat_id: Launcher(ROOT, chat["skill"], config.get("claude_path"),
-                          os.path.join(args.data_dir, f"{chat_id}.jsonl"), config[chat_id].get("min_score", 0.7))
+                          os.path.join(args.data_dir, f"{chat_id}.jsonl"), config[chat_id].get("min_score", 0.7),
+                          model=config.get("chat_model"))
         for chat_id, chat in CHATS.items() if config.get(chat_id)
     }
     server = LockServer(service, os.path.join(ROOT, "extension"), launchers=launchers)
