@@ -2,7 +2,7 @@
   "day_rollover_hour": 4,
   "anki": {
     "profile": "User 1",
-    "decks": ["Sprachen", "Essential Spanish Vocabulary Top 5000"],
+    "decks": ["Sprachen", "Essential Spanish Vocabulary Top 5000", "Sampling Methods for ML"],
     "cards": 200,
     "minutes": 30,
     "min_answer_ms": 1000

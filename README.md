@@ -35,8 +35,8 @@ Es müssen alle Aufgaben erledigt sein. Für schlechte Tage hat **jede Aufgabe e
 zum nächsten Tag um 4 Uhr. Dieselbe Aufgabe kannst du in einer Woche nur einmal erlassen, damit keine Gewohnheit
 wegfällt. Die Woche beginnt montags um 4 Uhr, nicht genutzte Joker verfallen.
 
-Bei Anki zählen nur die Decks unter `Sprachen` und `Essential Spanish Vocabulary Top 5000`. `Archiv`, `Master` und
-`Poker` zählen nicht und blockieren auch nicht. Jede Antwort zählt, auch bei derselben Karte; Antworten unter einer Sekunde zählen nicht als Karte.
+Bei Anki zählen nur die Decks unter `Sprachen`, `Essential Spanish Vocabulary Top 5000` und `Sampling Methods for ML`.
+`Archiv`, `Master` und `Poker` zählen nicht und blockieren auch nicht. Jede Antwort zählt, auch bei derselben Karte; Antworten unter einer Sekunde zählen nicht als Karte.
 Alle Werte stehen in `config.json`. Nach einer Änderung muss der Dienst neu starten.
 
 Karten, die du am Handy lernst, zählen erst, nachdem Anki am PC synchronisiert hat. Der Check liest eine Kopie der
