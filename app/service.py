@@ -39,6 +39,7 @@ def _custom_task(custom):
                 "link": custom.get("link", TYPING_LINK), "link_text": custom.get("link_text", "Zu edclub")}
     if kind == "papers":
         return {**base, "kind": "papers", "file": custom["file"], "path": custom.get("path"),
+                "project": custom.get("project"),
                 "min_summary_chars": custom.get("min_summary_chars", 150),
                 "min_takeaway_chars": custom.get("min_takeaway_chars", 60),
                 "link": PAPERS_LINK, "link_text": "Zum Lesepfad"}
@@ -47,7 +48,7 @@ def _custom_task(custom):
                 "min_recall_chars": custom.get("min_recall_chars", 80),
                 "link": PAPERS_LINK, "link_text": "Zum Wiederholen"}
     if kind == "log":
-        return {**base, "kind": "log", "file": custom.get("file"),
+        return {**base, "kind": "log", "file": custom.get("file"), "project": custom.get("project"),
                 "min_done_chars": custom.get("min_done_chars", 40),
                 "min_other_chars": custom.get("min_other_chars", 10),
                 "link": LOG_LINK, "link_text": "Zum Forschungslog"}
@@ -297,6 +298,7 @@ class LockService:
                 "today": today["day"],
                 "min_summary_chars": task["min_summary_chars"],
                 "min_takeaway_chars": task["min_takeaway_chars"],
+                "project": task.get("project"),
                 "review": review,
             }
 
@@ -406,6 +408,7 @@ class LockService:
             today = self._today()
             entries = [{"day": day, **entry} for day, entry in sorted(self.research_log.items(), reverse=True)]
             return {"today": today["day"], "entries": entries, "fields": LOG_FIELDS, "file": task["file"],
+                    "project": task.get("project"),
                     "min_done_chars": task["min_done_chars"], "min_other_chars": task["min_other_chars"]}
 
     def write_log(self, fields):
@@ -424,17 +427,17 @@ class LockService:
             self.research_log[today["day"]] = entry
             self._save_json(self.research_log_path, self.research_log)
             if task["file"]:
-                self._write_log_markdown(task["file"])
+                self._write_log_markdown(task["file"], task.get("project"))
         return self.log_data()
 
-    def _write_log_markdown(self, target):
+    def _write_log_markdown(self, target, project=None):
         # Never overwrite a file someone else wrote.
         if os.path.exists(target):
             with open(target, encoding="utf-8") as file:
                 if LOG_MARKER not in file.read(2000):
                     raise ValueError(f"{target} gibt es schon und stammt nicht vom Lock; Eintrag nur im Lock gespeichert")
         lines = [
-            "# Forschungslog Lean-CL-Eval", "",
+            f"# Forschungslog {project}" if project else "# Forschungslog", "",
             LOG_MARKER,
             "*Wird vom Productivity Lock geschrieben (http://127.0.0.1:47615/log), neueste Einträge oben. "
             "Änderungen direkt in dieser Datei werden beim nächsten Eintrag überschrieben.*", "",

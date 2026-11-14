@@ -273,7 +273,7 @@ function renderPanel() {
   $("r-recall").readOnly = comparing;
   if (due && comparing) {
     $("r-old-summary").textContent = read.summary;
-    $("r-old-takeaway").textContent = `Für Lean-CL-Eval: ${read.takeaway}`;
+    $("r-old-takeaway").textContent = `Für ${data.project || "dein Projekt"}: ${read.takeaway}`;
   }
   $("r-error").hidden = true;
   $("p-form").hidden = due || (Boolean(read) && !editing);
@@ -362,6 +362,10 @@ async function load() {
     $("load-error").hidden = false;
     return;
   }
+  const project = data.project || "dein Projekt";
+  $("p-takeaway-head").textContent = `Für ${project}`;
+  $("p-takeaway-label").textContent = `Was nimmst du für ${project} mit?`;
+  $("r-hint").textContent = `Deine Notizen bleiben verdeckt. Was war die Kernaussage, und was bedeutet sie für ${project}?`;
   buildTrack();
   renderReviewBox();
   const wanted = decodeURIComponent(location.hash.slice(1)) || data.plan.default;

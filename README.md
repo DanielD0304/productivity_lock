@@ -56,6 +56,61 @@ Weitere Pflichtaufgaben trägst du in `config.json` unter `custom_tasks` ein:
 - `check`: nur eine kurze Notiz, ohne Timer.
 - `timer`: Timer mit eigener Dauer und danach eine Notiz. Die Notizen stehen in `data/notes_log.jsonl`.
 - `github`: mindestens ein Push seit 4 Uhr. Das sieht nur Pushes in **öffentliche** Repositories.
+- `typing`: Minuten echtes Tippen auf edclub/typingclub, gezählt von der Erweiterung (`"minutes": 10`).
+- `papers`: täglich ein Paper aus einer Leseliste abhaken, mit Kernaussage und Projektbezug in eigenen Worten.
+- `paper_review`: gelesene Paper nach 7, 30 und 90 Tagen aus dem Kopf wiederholen.
+- `log`: Forschungslog mit drei Feldern pro Tag, optional als Markdown-Datei.
+
+```json
+{ "id": "paper", "title": "Paper lesen", "type": "papers", "file": "papers.json", "project": "Masterarbeit",
+  "min_summary_chars": 150, "min_takeaway_chars": 60 },
+{ "id": "wiederholen", "title": "Paper wiederholen", "type": "paper_review", "intervals": [7, 30, 90], "min_recall_chars": 80 },
+{ "id": "log", "title": "Forschungslog", "type": "log", "file": "C:/Pfad/FORSCHUNGSLOG.md", "project": "Masterarbeit" }
+```
+
+### Leseliste (`papers`)
+
+Die Seite <http://127.0.0.1:47615/papers> zeigt die Liste als Pfad: Zeilen in Lesereihenfolge, Spalten nach Thema,
+gestrichelte Bögen für Bezüge zwischen Papern. Mehrere Pfade lassen sich durchwischen (auch mit ←/→). Die Datei hat
+einen gemeinsamen Katalog und die Pfade; ein Haken gilt für ein Paper in allen Pfaden:
+
+```json
+{
+  "papers": { "leandojo": { "short": "LeanDojo", "title": "…", "source": "Yang et al., 2023", "url": "https://arxiv.org/abs/2306.15626" } },
+  "paths": [
+    { "id": "start", "title": "Einstieg", "stages": { "1": "Stufe 1: Grundlagen" },
+      "lanes": [ { "id": "retrieval", "title": "Retrieval" } ],
+      "items": [ { "id": "leandojo", "stage": 1, "lane": "retrieval", "why": "Warum lesen", "related": [] } ] }
+  ]
+}
+```
+
+Die Datei wird bei jedem Aufruf neu gelesen, Änderungen brauchen keinen Neustart. `"path"` in der Aufgabe wählt den
+Standardpfad, sonst gilt der erste. Höchstens fünf Spalten je Pfad bekommen eigene Farben.
+
+### Forschungslog (`log`)
+
+Die Seite <http://127.0.0.1:47615/log> fragt: gemacht, Ergebnis, als Nächstes. Der heutige Eintrag lässt sich den
+ganzen Tag ändern. Mit `file` schreibt der Lock alle Einträge als Markdown, neueste oben. Er überschreibt die Datei bei
+jedem Eintrag, aber nur, wenn sie von ihm stammt; eine fremde Datei mit demselben Namen bleibt unberührt.
+
+## Termine
+
+Mit `"termine_file": "termine.json"` in `config.json` zeigt die Checkliste oben die nächsten drei Termine mit
+Countdown. <http://127.0.0.1:47615/termine> zeigt alle, mit Zeitstrahl über zwölf Wochen, und hat ein Formular zum
+Hinzufügen und Löschen. Arten: `meilenstein`, `frist`, `pruefung`, `treffen`, `cluster`. Zeiträume bekommen ein `end`.
+Der Countdown nutzt das echte Datum, nicht den Lock-Tag ab 4 Uhr.
+
+## Anki-Decks ausschließen
+
+`"decks": []` zählt alle Decks, `"exclude_decks": ["Archiv"]` nimmt einzelne aus (samt Unterdecks). Ausschluss gewinnt.
+
+## Firefox
+
+Die Erweiterung läuft auch in Firefox ab Version 140. Dauerhaft installieren lässt sie sich nur signiert: den Inhalt von
+`extension` (ohne `_metadata`) zippen, auf addons.mozilla.org als „unlisted“ hochladen und die signierte Datei
+installieren. Zum Ausprobieren reicht `about:debugging` → „Temporäres Add-on laden“. Vor dem Hochladen die gecko-ID in
+`manifest.json` auf eine eigene ändern und bei jeder Änderung die Version erhöhen.
 
 ## Verlauf und Tray-Symbol
 
