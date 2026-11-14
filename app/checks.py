@@ -68,6 +68,13 @@ def _deck_matches(name, prefixes):
     return any(name == p or name.startswith(p + "::") for p in prefixes)
 
 
+def _deck_counts(name, settings):
+    # Without a "decks" list every deck counts, so newly imported decks need no config change.
+    if _deck_matches(name, settings.get("exclude_decks", [])):
+        return False
+    return not settings.get("decks") or _deck_matches(name, settings["decks"])
+
+
 def evaluate_anki(db, settings, now, rollover_hour):
     start_ms = int(day_start(now, rollover_hour).timestamp() * 1000)
 
@@ -78,7 +85,7 @@ def evaluate_anki(db, settings, now, rollover_hour):
     cards = {
         card
         for card, did, odid in db.execute("select id, did, odid from cards")
-        if _deck_matches(decks.get(odid or did, ""), settings["decks"])
+        if _deck_counts(decks.get(odid or did, ""), settings)
     }
 
     answers = 0

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Productivity Lock",
-  "version": "1.1.0",
+  "version": "1.2.3",
   "description": "Sperrt YouTube, Netflix und Instagram, bis die Aufgaben für heute erledigt sind.",
   "permissions": ["declarativeNetRequest", "alarms"],
   "host_permissions": [
@@ -10,11 +10,22 @@
     "*://youtu.be/*",
     "*://*.youtube-nocookie.com/*",
     "*://*.netflix.com/*",
-    "*://*.instagram.com/*"
+    "*://*.instagram.com/*",
+    "*://*.edclub.com/*",
+    "*://*.edclub.app/*",
+    "*://*.typingclub.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
   },
+  "content_scripts": [
+    {
+      "matches": ["*://*.edclub.com/*", "*://*.edclub.app/*", "*://*.typingclub.com/*"],
+      "js": ["typing.js"],
+      "all_frames": true
+    }
+  ],
   "declarative_net_request": {
     "rule_resources": [
       {
@@ -29,5 +40,12 @@
       "resources": ["locked.html"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "productivity-lock@liviii7.local",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
 }

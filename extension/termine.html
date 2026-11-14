@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Termine</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><a href="/">← Checkliste</a> · <a href="/log">Forschungslog</a> · <a href="/papers">Lesepfad</a></p>
+    <h1>Termine</h1>
+    <p class="summary" id="summary">Wird geladen …</p>
+    <p class="error" id="load-error" hidden></p>
+  </header>
+
+  <main id="content" hidden>
+    <section class="card hero" id="hero" hidden>
+      <div>
+        <div class="hero-number" id="hero-days"></div>
+        <div class="hero-unit" id="hero-unit"></div>
+      </div>
+      <div>
+        <span class="chip" id="hero-kind"></span>
+        <h2 id="hero-title"></h2>
+        <p class="muted" id="hero-date"></p>
+        <p class="muted" id="hero-note"></p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Die nächsten 12 Wochen</h2>
+      <div class="strip" id="strip" role="img" aria-label="Zeitstrahl der nächsten 12 Wochen"></div>
+    </section>
+
+    <section class="card">
+      <h2>Alle Termine</h2>
+      <ul class="events" id="upcoming"></ul>
+      <details id="past-box" hidden>
+        <summary id="past-summary"></summary>
+        <ul class="events" id="past"></ul>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Termin hinzufügen</h2>
+      <form id="form" class="form-grid">
+        <div class="wide">
+          <label for="t-title">Titel</label>
+          <input id="t-title" maxlength="120" autocomplete="off" placeholder="z. B. Mündliche Prüfung">
+        </div>
+        <div>
+          <label for="t-date">Datum</label>
+          <input id="t-date" type="date" required>
+        </div>
+        <div>
+          <label for="t-end">Bis (optional, für Zeiträume)</label>
+          <input id="t-end" type="date">
+        </div>
+        <div>
+          <label for="t-kind">Art</label>
+          <select id="t-kind"></select>
+        </div>
+        <div>
+          <label for="t-note">Notiz (optional)</label>
+          <input id="t-note" maxlength="300" autocomplete="off">
+        </div>
+        <div class="wide">
+          <p class="error" id="form-error" hidden></p>
+          <button type="submit">Hinzufügen</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="termine.js"></script>
+</body>
+</html>

@@ -30,6 +30,12 @@ def main():
     )
     with open(args.config, encoding="utf-8") as file:
         config = json.load(file)
+    # Files named in custom tasks (the reading plan) live next to the config.
+    for custom in config.get("custom_tasks", []):
+        if "file" in custom:
+            custom["file"] = os.path.join(os.path.dirname(os.path.abspath(args.config)), custom["file"])
+    if config.get("termine_file"):
+        config["termine_file"] = os.path.join(os.path.dirname(os.path.abspath(args.config)), config["termine_file"])
 
     service = LockService(config, args.data_dir)
     enforcer = Enforcer(config["blocked_processes"], config["game_process"])

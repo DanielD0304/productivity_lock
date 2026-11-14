@@ -9,13 +9,25 @@ PORT = 47615
 BASE_URL = f"http://127.0.0.1:{PORT}"
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 SAME_ORIGINS = {f"http://{host}" for host in ALLOWED_HOSTS}
+EXTENSION_ORIGINS = ("chrome-extension://", "moz-extension://")
 MAX_BODY_BYTES = 10_000
 TASK_ROUTE = re.compile(r"^/tasks/([a-z0-9_-]+)/(start|finish)$")
+PAPER_ROUTE = re.compile(r"^/papers/([a-z0-9_-]+)/(read|review)$")
+TERMIN_DELETE_ROUTE = re.compile(r"^/termine/([a-f0-9]{8})/delete$")
 STATIC_FILES = {
     "/": ("locked.html", "text/html; charset=utf-8"),
     "/locked.js": ("locked.js", "text/javascript; charset=utf-8"),
     "/locked.css": ("locked.css", "text/css; charset=utf-8"),
+    "/papers": ("papers.html", "text/html; charset=utf-8"),
+    "/papers.js": ("papers.js", "text/javascript; charset=utf-8"),
+    "/papers.css": ("papers.css", "text/css; charset=utf-8"),
+    "/log": ("log.html", "text/html; charset=utf-8"),
+    "/log.js": ("log.js", "text/javascript; charset=utf-8"),
+    "/termine": ("termine.html", "text/html; charset=utf-8"),
+    "/termine.js": ("termine.js", "text/javascript; charset=utf-8"),
+    "/pages.css": ("pages.css", "text/css; charset=utf-8"),
 }
+DATA_ROUTES = {"/papers/data": "papers", "/log/data": "log_data", "/termine/data": "termine"}
 
 
 class LockServer(ThreadingHTTPServer):
@@ -35,7 +47,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _origin_allowed(self):
         origin = self.headers.get("Origin")
-        return origin is None or origin in SAME_ORIGINS or origin.startswith("chrome-extension://")
+        return origin is None or origin in SAME_ORIGINS or origin.startswith(EXTENSION_ORIGINS)
 
     def _request_allowed(self):
         # Websites must not be able to drive the timer, directly or via DNS rebinding.
@@ -75,6 +87,11 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/status":
             refresh = parse_qs(url.query).get("refresh") == ["1"]
             self._send_json(200, self.server.service.status(refresh=refresh))
+        elif url.path in DATA_ROUTES:
+            try:
+                self._send_json(200, getattr(self.server.service, DATA_ROUTES[url.path])())
+            except (OSError, ValueError) as error:
+                self._send_json(404, {"error": str(error)})
         elif url.path in STATIC_FILES:
             name, content_type = STATIC_FILES[url.path]
             with open(os.path.join(self.server.static_dir, name), "rb") as file:
@@ -89,23 +106,48 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Nicht gefunden"})
 
     def do_POST(self):
+        length = int(self.headers.get("Content-Length") or 0)
+        # Read the body even before refusing: unread data makes Windows reset the connection.
+        raw = self.rfile.read(length) if length <= MAX_BODY_BYTES else b""
         if not self._request_allowed():
             return
-        length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY_BYTES:
             self._send_json(413, {"error": "Zu lang"})
             return
-        raw = self.rfile.read(length)
         service = self.server.service
         task_route = TASK_ROUTE.match(self.path)
+        paper_route = PAPER_ROUTE.match(self.path)
+        delete_route = TERMIN_DELETE_ROUTE.match(self.path)
         try:
+            body = json.loads(raw or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError("Ungültige Anfrage")
+            if paper_route and paper_route[2] == "read":
+                self._send_json(200, service.read_paper(paper_route[1], body.get("summary"), body.get("takeaway")))
+                return
+            if paper_route:
+                self._send_json(200, service.review_paper(paper_route[1], body.get("recall"), body.get("rating")))
+                return
+            if self.path == "/log":
+                self._send_json(200, service.write_log(body))
+                return
+            if self.path == "/termine":
+                self._send_json(200, service.add_termin(body))
+                return
+            if delete_route:
+                self._send_json(200, service.delete_termin(delete_route[1]))
+                return
             if task_route and task_route[2] == "start":
                 self._send_json(200, service.start_task(task_route[1]))
             elif task_route:
                 self._send_json(200, service.finish_task(task_route[1], json.loads(raw or b"{}").get("note")))
+            elif self.path == "/typing":
+                self._send_json(200, service.add_typing(json.loads(raw or b"{}").get("seconds")))
             elif self.path == "/joker":
                 self._send_json(200, service.use_joker(json.loads(raw or b"{}").get("reason")))
             else:
                 self._send_json(404, {"error": "Nicht gefunden"})
         except ValueError as error:
             self._send_json(400, {"error": str(error)})
+        except OSError as error:
+            self._send_json(500, {"error": f"Datei konnte nicht geschrieben werden: {error}"})

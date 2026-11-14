@@ -1,4 +1,5 @@
 const STATUS_URL = "http://127.0.0.1:47615/status";
+const TYPING_URL = "http://127.0.0.1:47615/typing";
 const RULESET = "block";
 const BLOCKED_TABS = [
   "*://*.youtube.com/*",
@@ -32,11 +33,30 @@ async function sync() {
   return unlocked;
 }
 
+// Content scripts cannot reach the service themselves: it only accepts the extension's origin.
+async function reportTyping(seconds) {
+  try {
+    const response = await fetch(TYPING_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seconds }),
+      signal: AbortSignal.timeout(4000),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 chrome.alarms.create("sync", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener(sync);
 chrome.runtime.onInstalled.addListener(sync);
 chrome.runtime.onStartup.addListener(sync);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message.type === "typing") {
+    reportTyping(message.seconds).then(respond);
+    return true;
+  }
   if (message.type !== "sync") return false;
   sync().then(respond);
   return true;

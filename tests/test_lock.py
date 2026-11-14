@@ -101,6 +101,14 @@ class AnkiRuleTest(unittest.TestCase):
         fixture.answered_today(200, deck=2)
         self.assertTrue(fixture.evaluate()["done"])
 
+    def test_without_deck_list_all_but_excluded_decks_count(self):
+        fixture = AnkiFixture()
+        settings = {**ANKI, "decks": [], "exclude_decks": ["Archiv"]}
+        fixture.answered_today(200, deck=3)
+        self.assertIn("0/200 Karten", checks.evaluate_anki(fixture.db, settings, NOW, 4)["detail"])
+        fixture.answered_today(200, deck=4)
+        self.assertTrue(checks.evaluate_anki(fixture.db, settings, NOW, 4)["done"])
+
     def test_flicked_answers_do_not_count_as_cards(self):
         fixture = AnkiFixture()
         fixture.answered_today(300, taken_ms=999)
@@ -436,6 +444,327 @@ class CustomTaskTest(ServiceBase):
         self.assertTrue(status["checks"]["code"]["done"])
 
 
+class TypingTaskTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        config = {**CONFIG, "custom_tasks": [{"id": "tippen", "title": "Tippen", "type": "typing", "minutes": 10}]}
+        self.service = LockService(config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def typing(self):
+        return self.service.status(network=False)["checks"]["tippen"]
+
+    def test_ten_minutes_of_reports_finish_the_task(self):
+        self.assertEqual(self.typing()["link"], "https://www.edclub.com/")
+        for _ in range(39):
+            self.clock.advance(15)
+            self.service.add_typing(15)
+        self.assertFalse(self.typing()["done"])
+        self.clock.advance(15)
+        self.service.add_typing(15)
+        self.assertTrue(self.typing()["done"])
+        self.assertEqual(self.typing()["detail"], "10/10 Min getippt")
+
+    def test_reports_cannot_outrun_the_clock(self):
+        self.service.add_typing(500)
+        self.service.add_typing(15)
+        self.clock.advance(5)
+        self.assertEqual(self.service.add_typing(15), {"tippen": 65})
+
+    def test_invalid_seconds_are_refused(self):
+        for seconds in (None, "15", True, 0, -3):
+            with self.assertRaises(ValueError):
+                self.service.add_typing(seconds)
+
+    def test_progress_resets_with_the_day(self):
+        self.service.add_typing(60)
+        self.clock.advance(24 * 3600)
+        self.assertEqual(self.typing()["detail"], "0/10 Min getippt")
+
+
+SUMMARY = "Das Paper zeigt, dass ein Prover auf opaken Namen nur mit passendem Kontext etwas löst. " * 2
+TAKEAWAY = "Für indlib heißt das: klare Abgrenzung über Induktion und den Strom."
+
+
+class PapersTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.plan_path = os.path.join(self.dir, "papers.json")
+        self.write_plan(["a", "b"])
+        config = {**CONFIG, "custom_tasks": [{"id": "paper", "title": "Paper", "type": "papers", "file": self.plan_path}]}
+        self.service = LockService(config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def write_plan(self, ids):
+        papers = [{"id": pid, "short": pid.upper(), "stage": 1, "lane": "x", "related": []} for pid in ids]
+        with open(self.plan_path, "w", encoding="utf-8") as file:
+            json.dump({"papers": papers}, file)
+
+    def paper_task(self):
+        return self.service.status(network=False)["checks"]["paper"]
+
+    def test_reading_one_paper_finishes_the_day(self):
+        self.assertEqual(self.paper_task()["detail"], "Als Nächstes: A")
+        self.assertEqual(self.paper_task()["link"], "http://127.0.0.1:47615/papers")
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.assertTrue(self.paper_task()["done"])
+        self.assertEqual(self.paper_task()["detail"], "Heute gelesen: A")
+
+    def test_next_day_needs_a_new_paper(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.clock.advance(24 * 3600)
+        self.assertFalse(self.paper_task()["done"])
+        self.assertEqual(self.paper_task()["detail"], "Als Nächstes: B")
+
+    def test_editing_notes_keeps_the_reading_day(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.clock.advance(24 * 3600)
+        self.service.read_paper("a", SUMMARY + " Ergänzt.", TAKEAWAY)
+        self.assertFalse(self.paper_task()["done"])
+        self.assertTrue(self.service.papers()["progress"]["a"]["summary"].endswith("Ergänzt."))
+
+    def test_short_notes_and_unknown_papers_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "Kernaussage"):
+            self.service.read_paper("a", "zu kurz", TAKEAWAY)
+        with self.assertRaisesRegex(ValueError, "Projektbezug"):
+            self.service.read_paper("a", SUMMARY, "kurz")
+        with self.assertRaisesRegex(ValueError, "Unbekanntes"):
+            self.service.read_paper("zzz", SUMMARY, TAKEAWAY)
+        self.assertFalse(self.paper_task()["done"])
+
+    def test_progress_survives_a_restart(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        restarted = LockService(self.service.config, self.dir, clock=self.clock,
+                                anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+        self.assertIn("a", restarted.papers()["progress"])
+
+    def test_finished_list_does_not_lock_forever(self):
+        self.write_plan(["a"])
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.clock.advance(24 * 3600)
+        self.assertTrue(self.paper_task()["done"])
+
+    def test_broken_list_reports_an_error(self):
+        with open(self.plan_path, "w", encoding="utf-8") as file:
+            file.write("{kaputt")
+        task = self.paper_task()
+        self.assertFalse(task["done"])
+        self.assertTrue(task["error"])
+
+    def test_manual_credit_counts_for_one_day(self):
+        self.service._today()["credited"] = {"paper": "neue Liste, gilt ab morgen"}
+        self.assertTrue(self.paper_task()["done"])
+        self.assertEqual(self.paper_task()["detail"], "Gutgeschrieben: neue Liste, gilt ab morgen")
+        self.clock.advance(24 * 3600)
+        self.assertFalse(self.paper_task()["done"])
+
+    def write_paths(self):
+        plan = {
+            "papers": {"a": {"short": "A", "title": "Paper A"}, "b": {"short": "B"}, "c": {"short": "C"}},
+            "paths": [
+                {"id": "neu", "title": "Neu", "items": [{"id": "c", "stage": 1, "lane": "x"}, {"id": "a", "stage": 1, "lane": "x"}]},
+                {"id": "alt", "title": "Alt", "items": [{"id": "a", "stage": 1, "lane": "y", "why": "alt"}, {"id": "b", "stage": 2, "lane": "y"}]},
+            ],
+        }
+        with open(self.plan_path, "w", encoding="utf-8") as file:
+            json.dump(plan, file)
+
+    def test_several_paths_share_the_catalogue_and_progress(self):
+        self.write_paths()
+        plan = self.service.papers()["plan"]
+        self.assertEqual([path["id"] for path in plan["paths"]], ["neu", "alt"])
+        self.assertEqual(plan["default"], "neu")
+        self.assertEqual(plan["paths"][1]["papers"][0]["title"], "Paper A")
+        self.assertEqual(plan["paths"][1]["papers"][0]["why"], "alt")
+        self.assertEqual(self.paper_task()["detail"], "Als Nächstes: C")
+        self.service.read_paper("b", SUMMARY, TAKEAWAY)  # only in the second path
+        self.assertTrue(self.paper_task()["done"])
+        self.assertIn("b", self.service.papers()["progress"])
+
+    def test_finished_default_path_points_to_the_other_paths(self):
+        self.write_paths()
+        self.service.read_paper("c", SUMMARY, TAKEAWAY)
+        self.clock.advance(24 * 3600)
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.clock.advance(24 * 3600)
+        self.assertEqual(self.paper_task()["detail"], "Als Nächstes: B")
+
+    def test_config_can_choose_the_default_path(self):
+        self.write_paths()
+        self.service.tasks[-1]["path"] = "alt"
+        self.assertEqual(self.service.papers()["plan"]["default"], "alt")
+        self.assertEqual(self.paper_task()["detail"], "Als Nächstes: A")
+
+
+RECALL = "Kernaussage aus dem Kopf: Ohne die passenden Lemmas im Kontext löst der Prover fast nichts."
+
+
+class ReviewTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.plan_path = os.path.join(self.dir, "papers.json")
+        papers = [{"id": pid, "short": pid.upper(), "stage": 1, "lane": "x"} for pid in ("a", "b")]
+        with open(self.plan_path, "w", encoding="utf-8") as file:
+            json.dump({"papers": papers}, file)
+        config = {**CONFIG, "custom_tasks": [
+            {"id": "paper", "title": "Paper", "type": "papers", "file": self.plan_path},
+            {"id": "wiederholen", "title": "Wiederholen", "type": "paper_review", "intervals": [7, 30]},
+        ]}
+        self.service = LockService(config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def review_task(self):
+        return self.service.status(network=False)["checks"]["wiederholen"]
+
+    def days(self, count):
+        self.clock.advance(count * 24 * 3600)
+
+    def test_nothing_read_means_nothing_due(self):
+        self.assertTrue(self.review_task()["done"])
+        self.assertEqual(self.review_task()["detail"], "Nichts fällig")
+
+    def test_paper_is_due_a_week_after_reading(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.days(6)
+        self.assertTrue(self.review_task()["done"])
+        self.assertEqual(self.review_task()["detail"], "Nichts fällig · nächste am 07.11.")
+        self.days(1)
+        self.assertFalse(self.review_task()["done"])
+        self.assertEqual(self.review_task()["detail"], "Fällig: A")
+        self.assertEqual(self.service.papers()["review"]["due"], ["a"])
+
+    def test_good_review_moves_to_the_next_interval(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.days(7)
+        self.service.review_paper("a", RECALL, "sitzt")
+        self.assertTrue(self.review_task()["done"])
+        self.assertEqual(self.review_task()["detail"], "Heute wiederholt: A")
+        self.assertEqual(self.service.papers()["review"]["next"]["a"], "2026-12-07")
+        with self.assertRaisesRegex(ValueError, "nicht zum Wiederholen"):
+            self.service.review_paper("a", RECALL, "sitzt")
+
+    def test_forgotten_starts_over_and_last_interval_ends(self):
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        self.days(7)
+        self.service.review_paper("a", RECALL, "vergessen")
+        self.assertEqual(self.service.papers()["review"]["next"]["a"], "2026-11-14")
+        self.days(7)
+        self.service.review_paper("a", RECALL, "sitzt")
+        self.days(30)
+        self.service.review_paper("a", RECALL, "sitzt")
+        self.assertIsNone(self.service.papers()["review"]["next"]["a"])
+
+    def test_bad_reviews_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "noch nicht gelesen"):
+            self.service.review_paper("a", RECALL, "sitzt")
+        self.service.read_paper("a", SUMMARY, TAKEAWAY)
+        with self.assertRaisesRegex(ValueError, "nicht zum Wiederholen"):
+            self.service.review_paper("a", RECALL, "sitzt")
+        self.days(7)
+        with self.assertRaisesRegex(ValueError, "Zeichen"):
+            self.service.review_paper("a", "kurz", "sitzt")
+        with self.assertRaisesRegex(ValueError, "Bewertung"):
+            self.service.review_paper("a", RECALL, "super")
+        self.assertFalse(self.review_task()["done"])
+
+
+class ResearchLogTest(ServiceBase):
+    ENTRY = {"done": "PFR-Strom in vier Stufen geteilt und den Index-Arm gestartet.",
+             "result": "BWT im Index-Arm ist -2 Punkte.", "next": "Gedächtnis-Arm starten."}
+
+    def setUp(self):
+        super().setUp()
+        self.markdown = os.path.join(self.dir, "LOG.md")
+        config = {**CONFIG, "custom_tasks": [{"id": "log", "title": "Log", "type": "log", "file": self.markdown}]}
+        self.service = LockService(config, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def log_task(self):
+        return self.service.status(network=False)["checks"]["log"]
+
+    def test_entry_finishes_the_day_and_writes_markdown(self):
+        self.assertFalse(self.log_task()["done"])
+        self.service.write_log(self.ENTRY)
+        self.assertTrue(self.log_task()["done"])
+        with open(self.markdown, encoding="utf-8") as file:
+            text = file.read()
+        self.assertIn("## Sa 31.10.2026", text)
+        self.assertIn("- **Ergebnis:** BWT im Index-Arm ist -2 Punkte.", text)
+
+    def test_same_day_edits_and_next_day_is_open(self):
+        self.service.write_log(self.ENTRY)
+        self.service.write_log({**self.ENTRY, "next": "Doch erst den Orakel-Lauf."})
+        data = self.service.log_data()
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["next"], "Doch erst den Orakel-Lauf.")
+        self.clock.advance(24 * 3600)
+        self.assertFalse(self.log_task()["done"])
+
+    def test_short_entries_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "Gemacht"):
+            self.service.write_log({**self.ENTRY, "done": "wenig"})
+        with self.assertRaisesRegex(ValueError, "Als Nächstes"):
+            self.service.write_log({**self.ENTRY, "next": ""})
+        self.assertFalse(self.log_task()["done"])
+
+    def test_foreign_markdown_file_is_never_overwritten(self):
+        with open(self.markdown, "w", encoding="utf-8") as file:
+            file.write("Meine eigenen Notizen")
+        with self.assertRaisesRegex(ValueError, "stammt nicht vom Lock"):
+            self.service.write_log(self.ENTRY)
+        with open(self.markdown, encoding="utf-8") as file:
+            self.assertEqual(file.read(), "Meine eigenen Notizen")
+
+
+class TermineTest(ServiceBase):
+    def setUp(self):
+        super().setUp()
+        self.path = os.path.join(self.dir, "termine.json")
+        self.service = LockService({**CONFIG, "termine_file": self.path}, self.dir, clock=self.clock,
+                                   anki_check=lambda now: self.anki, leetcode_check=self.fake_leetcode)
+
+    def add(self, date, title, **extra):
+        return self.service.add_termin({"date": date, "title": title, **extra})
+
+    def test_countdown_and_state(self):
+        self.add("2026-11-02", "Abgabe", kind="frist")
+        self.add("2026-10-30", "Downtime", end="2026-11-03", kind="cluster")
+        self.add("2026-10-20", "Altes Treffen", kind="treffen")
+        events = {event["title"]: event for event in self.service.termine()["events"]}
+        self.assertEqual(events["Abgabe"]["days"], 2)
+        self.assertEqual(events["Abgabe"]["state"], "upcoming")
+        self.assertEqual(events["Downtime"]["state"], "running")
+        self.assertEqual(events["Downtime"]["end_days"], 3)
+        self.assertEqual(events["Altes Treffen"]["state"], "past")
+        upcoming = self.service.status(network=False)["termine"]
+        self.assertEqual([event["title"] for event in upcoming], ["Downtime", "Abgabe"])
+
+    def test_countdown_uses_the_calendar_day(self):
+        self.add("2026-11-01", "Morgen")
+        self.clock.advance(13 * 3600)  # 01:00, still the previous lock day
+        self.assertEqual(self.service.termine()["events"][0]["state"], "running")
+
+    def test_delete(self):
+        termin_id = self.add("2026-11-02", "Abgabe")["events"][0]["id"]
+        self.assertEqual(self.service.delete_termin(termin_id)["events"], [])
+        with self.assertRaisesRegex(ValueError, "Unbekannter"):
+            self.service.delete_termin(termin_id)
+
+    def test_invalid_entries_are_refused(self):
+        with self.assertRaisesRegex(ValueError, "Datum"):
+            self.add("31.12.2026", "Prüfung")
+        with self.assertRaisesRegex(ValueError, "Ende"):
+            self.add("2026-12-02", "Prüfung", end="2026-12-01")
+        with self.assertRaisesRegex(ValueError, "Titel"):
+            self.add("2026-12-02", "x")
+        with self.assertRaisesRegex(ValueError, "Art"):
+            self.add("2026-12-02", "Prüfung", kind="party")
+        self.assertEqual(self.service.termine()["events"], [])
+
+    def test_without_file_there_are_no_deadlines(self):
+        self.assertEqual(self.make_service().status(network=False)["termine"], [])
+
+
 class GitHubParseTest(unittest.TestCase):
     start = dt.datetime(2026, 10, 31, 4, 0)
 
@@ -513,6 +842,21 @@ class ExtensionFilesTest(unittest.TestCase):
                 self.assertIn(domain, rule["condition"]["requestDomains"])
             self.assertIn(f"*://*.{domain}/*", permissions)
             self.assertIn(f"*://*.{domain}/*", background)
+
+    def test_manifest_runs_in_chrome_and_firefox(self):
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
+        with open(os.path.join(root, "manifest.json"), encoding="utf-8") as file:
+            manifest = json.load(file)
+        self.assertEqual(manifest["background"]["service_worker"], "background.js")
+        self.assertEqual(manifest["background"]["scripts"], ["background.js"])
+        self.assertIn("id", manifest["browser_specific_settings"]["gecko"])
+        # edclub runs the typing field in an iframe on edclub.app.
+        self.assertIn("*://*.edclub.app/*", manifest["content_scripts"][0]["matches"])
+        for script in manifest["content_scripts"]:
+            for path in script["js"]:
+                self.assertTrue(os.path.exists(os.path.join(root, path)))
+            for match in script["matches"]:
+                self.assertIn(match, manifest["host_permissions"])
 
 
 class JokerTest(ServiceBase):
@@ -697,6 +1041,43 @@ class ServerTest(unittest.TestCase):
         origin = "chrome-extension://abc"
         _, _, headers = self.request("/status", origin=origin)
         self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
+
+    def test_firefox_extension_origin_gets_cors(self):
+        origin = "moz-extension://abc"
+        _, _, headers = self.request("/status", origin=origin)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
+
+    def test_typing_endpoint(self):
+        self.assertEqual(self.request("/typing", method="POST", body={"seconds": "x"})[0], 400)
+        self.assertEqual(self.request("/typing", method="POST", body={"seconds": 15}, origin="moz-extension://a")[0], 200)
+
+    def test_new_pages_are_served(self):
+        for page in ("/log", "/termine", "/log.js", "/termine.js", "/pages.css"):
+            self.assertEqual(self.request(page)[0], 200, page)
+        self.assertEqual(self.request("/log/data")[0], 404)
+        self.assertEqual(self.request("/termine/data")[0], 200)
+
+    def test_foreign_website_cannot_add_deadlines_or_logs(self):
+        for path in ("/termine", "/log", "/papers/a/review"):
+            code, _, _ = self.request(path, method="POST", body={}, origin="https://evil.example")
+            self.assertEqual(code, 403, path)
+
+    def test_review_without_task_is_a_clean_error(self):
+        code, body, _ = self.request("/papers/a/review", method="POST", body={"recall": "x", "rating": "sitzt"})
+        self.assertEqual(code, 400)
+        self.assertIn("Wiederhol", json.loads(body)["error"])
+
+    def test_papers_without_task_is_404(self):
+        self.assertEqual(self.request("/papers/data")[0], 404)
+        self.assertEqual(self.request("/papers")[0], 200)
+
+    def test_foreign_website_cannot_tick_papers(self):
+        code, _, _ = self.request("/papers/a/read", method="POST", body={}, origin="https://evil.example")
+        self.assertEqual(code, 403)
+
+    def test_edclub_page_cannot_report_typing(self):
+        code, _, _ = self.request("/typing", method="POST", body={"seconds": 15}, origin="https://www.edclub.com")
+        self.assertEqual(code, 403)
 
     def test_foreign_website_is_refused(self):
         code, _, _ = self.request("/tasks/reading/start", method="POST", body={}, origin="https://evil.example")

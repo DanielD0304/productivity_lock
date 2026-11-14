@@ -176,3 +176,17 @@ button.nav:disabled { color: var(--line); cursor: default; }
 .joker button.quiet { display: block; margin-top: 4px; }
 #joker-form button { margin-right: 12px; }
 #joker-form button.quiet { display: inline-block; }
+
+/* Upcoming deadlines */
+.termine { margin: -8px 0 20px; }
+.termine-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.termin { display: flex; gap: 10px; align-items: baseline; font-size: 14px; padding-left: 10px; border-left: 3px solid var(--line); }
+.termin-when { min-width: 92px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.termin-title { color: var(--muted); }
+.termin.running .termin-when { color: var(--accent); }
+.kind-meilenstein { border-color: #2f64ad; }
+.kind-frist { border-color: #c27420; }
+.kind-pruefung { border-color: #c0395f; }
+.kind-treffen { border-color: #13806a; }
+.kind-cluster { border-color: #8a5cc4; }
+.termine-link { display: inline-block; margin-top: 6px; font-size: 14px; color: var(--accent); }

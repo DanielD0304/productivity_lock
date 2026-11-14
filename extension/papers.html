@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesepfad</title>
+  <link rel="stylesheet" href="papers.css">
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><a href="/">← Checkliste</a> · <a href="/log">Forschungslog</a> · <a href="/termine">Termine</a></p>
+    <h1>Lesepfad</h1>
+    <p class="summary" id="summary">Wird geladen …</p>
+    <p class="error" id="load-error" hidden></p>
+    <ul class="legend" id="legend"></ul>
+    <section class="review-box" id="review-box" hidden>
+      <h2>Heute wiederholen</h2>
+      <p class="hint">Erst aus dem Kopf aufschreiben, dann mit deiner alten Notiz vergleichen.</p>
+      <ul class="review-list" id="review-list"></ul>
+    </section>
+  </header>
+
+  <main>
+    <section class="path" aria-label="Lesepfade, zum Wechseln wischen">
+      <nav class="switcher">
+        <button class="arrow" id="prev" type="button" aria-label="Vorheriger Pfad">‹</button>
+        <div class="switch-title">
+          <strong id="path-title"></strong>
+          <span class="path-source" id="path-source"></span>
+          <div class="dots" id="dots"></div>
+        </div>
+        <button class="arrow" id="next" type="button" aria-label="Nächster Pfad">›</button>
+      </nav>
+      <div class="track" id="track"></div>
+    </section>
+
+    <aside class="panel" id="panel" hidden>
+      <p class="meta" id="p-meta"></p>
+      <h2 id="p-title"></h2>
+      <p class="source"><span id="p-source"></span> · <a id="p-link" target="_blank" rel="noreferrer">Paper öffnen ↗</a></p>
+
+      <p class="meta" id="p-elsewhere" hidden></p>
+
+      <h3>Warum lesen</h3>
+      <p id="p-why"></p>
+
+      <div id="p-related-box">
+        <h3>Bezüge</h3>
+        <ul class="related" id="p-related"></ul>
+      </div>
+
+      <div class="notes" id="p-notes" hidden>
+        <h3 id="p-read-on"></h3>
+        <h4>Kernaussage</h4>
+        <p id="p-summary"></p>
+        <h4>Für Lean-CL-Eval</h4>
+        <p id="p-takeaway"></p>
+        <p class="meta reviews" id="p-reviews" hidden></p>
+        <button class="quiet" id="p-edit" type="button">Notizen bearbeiten</button>
+      </div>
+
+      <form id="r-form" hidden>
+        <h3>Wiederholen</h3>
+        <p class="hint">Deine Notizen bleiben verdeckt. Was war die Kernaussage, und was bedeutet sie für Lean-CL-Eval?</p>
+        <label for="r-recall">Aus dem Kopf</label>
+        <textarea id="r-recall" rows="5" maxlength="3000"></textarea>
+        <p class="count" id="r-count"></p>
+        <button id="r-compare" type="submit">Mit meiner Notiz vergleichen</button>
+        <div id="r-result" hidden>
+          <h4>Deine Notiz damals</h4>
+          <p id="r-old-summary"></p>
+          <p class="meta" id="r-old-takeaway"></p>
+          <h4>Wie gut saß es?</h4>
+          <div class="ratings">
+            <button type="button" data-rating="sitzt">Sitzt</button>
+            <button type="button" data-rating="teilweise">Teilweise</button>
+            <button type="button" data-rating="vergessen">Vergessen</button>
+          </div>
+        </div>
+        <p class="error" id="r-error" hidden></p>
+      </form>
+
+      <form id="p-form" hidden>
+        <p class="hint">Schreib aus dem Kopf, ohne ins Paper zu schauen. Was du so nicht formulieren kannst, hast du noch nicht verstanden.</p>
+        <label for="p-summary-input">Kernaussage in eigenen Worten</label>
+        <textarea id="p-summary-input" rows="5" maxlength="3000"></textarea>
+        <p class="count" id="p-summary-count"></p>
+        <label for="p-takeaway-input">Was nimmst du für Lean-CL-Eval mit?</label>
+        <textarea id="p-takeaway-input" rows="3" maxlength="3000"></textarea>
+        <p class="count" id="p-takeaway-count"></p>
+        <p class="error" id="p-error" hidden></p>
+        <button id="p-submit" type="submit">Als gelesen abhaken</button>
+        <button class="quiet" id="p-cancel" type="button" hidden>Abbrechen</button>
+      </form>
+    </aside>
+  </main>
+  <script src="papers.js"></script>
+</body>
+</html>

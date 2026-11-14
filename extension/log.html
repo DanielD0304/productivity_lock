@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forschungslog</title>
+  <link rel="stylesheet" href="pages.css">
+</head>
+<body>
+  <header>
+    <p class="eyebrow"><a href="/">← Checkliste</a> · <a href="/termine">Termine</a> · <a href="/papers">Lesepfad</a></p>
+    <h1>Forschungslog</h1>
+    <p class="summary" id="summary">Wird geladen …</p>
+    <p class="error" id="load-error" hidden></p>
+  </header>
+
+  <main id="content" hidden>
+    <section class="card">
+      <h2 id="form-title">Heute</h2>
+      <form id="form">
+        <label for="f-done">Was hast du heute gemacht?</label>
+        <textarea id="f-done" rows="3" maxlength="2000"></textarea>
+        <p class="count" id="c-done"></p>
+        <label for="f-result">Was kam heraus? (Zahl, Befund, oder „nichts, weil …“)</label>
+        <textarea id="f-result" rows="2" maxlength="2000"></textarea>
+        <p class="count" id="c-result"></p>
+        <label for="f-next">Was kommt als Nächstes?</label>
+        <textarea id="f-next" rows="2" maxlength="2000"></textarea>
+        <p class="count" id="c-next"></p>
+        <p class="error" id="form-error" hidden></p>
+        <button type="submit" id="submit">Eintrag speichern</button>
+        <p class="ok-text" id="saved" hidden></p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Für das nächste Treffen</h2>
+      <div class="export">
+        <div>
+          <label for="since">Einträge seit</label>
+          <input id="since" type="date">
+        </div>
+        <button type="button" id="copy">Als Text kopieren</button>
+        <span class="muted" id="copied"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Bisherige Einträge</h2>
+      <p class="muted" id="empty" hidden>Noch keine Einträge.</p>
+      <ul class="entries" id="entries"></ul>
+    </section>
+  </main>
+  <script src="log.js"></script>
+</body>
+</html>

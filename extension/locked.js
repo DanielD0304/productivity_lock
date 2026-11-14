@@ -164,6 +164,30 @@ function moveMonth(step) {
   renderCalendar(lastHistory);
 }
 
+function countdownText(event) {
+  if (event.state === "running") {
+    return event.end ? `läuft noch ${event.end_days} ${event.end_days === 1 ? "Tag" : "Tage"}` : "heute";
+  }
+  return event.days === 1 ? "morgen" : `in ${event.days} Tagen`;
+}
+
+function renderTermine(events) {
+  const list = events || [];
+  $("termine").hidden = list.length === 0;
+  $("termine-list").replaceChildren(...list.map((event) => {
+    const item = document.createElement("li");
+    item.className = `termin kind-${event.kind}${event.state === "running" ? " running" : ""}`;
+    const when = document.createElement("span");
+    when.className = "termin-when";
+    when.textContent = countdownText(event);
+    const title = document.createElement("span");
+    title.className = "termin-title";
+    title.textContent = event.title;
+    item.append(when, title);
+    return item;
+  }));
+}
+
 async function render(status) {
   const checks = Object.values(status.checks);
   const finished = checks.filter((check) => check.done).length;
@@ -174,6 +198,7 @@ async function render(status) {
   renderJoker(status.joker, allDone);
   for (const [id, check] of Object.entries(status.checks)) renderTask(id, check);
   renderHistory(status.history, status.day);
+  renderTermine(status.termine);
   tickTimers();
   if (status.unlocked && !wasUnlocked && inExtension) {
     // Lift the block before offering the links.
