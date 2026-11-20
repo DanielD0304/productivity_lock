@@ -9,3 +9,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+
+# Persoenliche Lern-Skills, nur lokal
+.claude/skills/lernchat/
+.claude/skills/sprachchat/
