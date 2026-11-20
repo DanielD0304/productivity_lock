@@ -5,6 +5,7 @@
   "extensions": {
     "colorMeta": {
       "ink": { "role": "primary", "displayName": "Ink" },
+      "go": { "role": "secondary", "displayName": "Go green", "purpose": "Frei dot and calendar completion ramp" },
       "ground": { "role": "neutral", "displayName": "Ground" },
       "surface": { "role": "neutral", "displayName": "Surface" },
       "ink-secondary": { "role": "neutral", "displayName": "Secondary ink" },

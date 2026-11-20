@@ -96,8 +96,8 @@ class MainActivity : Activity() {
     // Follows the phone's light or dark mode, in the same greys as the checklist page.
     private val night get() =
         (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-    private val groundColor get() = if (night) Color.BLACK else Color.rgb(245, 245, 247)
-    private val primaryText get() = if (night) Color.rgb(245, 245, 247) else Color.rgb(29, 29, 31)
+    private val groundColor get() = if (night) Color.rgb(22, 22, 24) else Color.rgb(245, 245, 247)
+    private val primaryText get() = if (night) Color.rgb(236, 236, 239) else Color.rgb(29, 29, 31)
     private val secondaryText get() = if (night) Color.rgb(161, 161, 166) else Color.rgb(110, 110, 115)
 
     private fun text(value: String, size: Float = 16f, color: Int = primaryText) = TextView(this).apply {
@@ -211,7 +211,7 @@ class MainActivity : Activity() {
         val since = status?.optString("day")?.takeIf { it.isNotEmpty() }?.let { "Letzter Stand vom Lerntag $it." } ?: "Noch kein Stand vom PC."
         return """
             <html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
-            <style>body{background:#f5f5f7;color:#1d1d1f}@media (prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}}</style></head>
+            <style>body{background:#f5f5f7;color:#1d1d1f}@media (prefers-color-scheme:dark){body{background:#161618;color:#ececef}}</style></head>
             <body style="font-family:sans-serif;padding:24px">
             <h2>PC nicht erreichbar</h2>
             <p>$state $since</p>

@@ -7,14 +7,19 @@ colors:
   ink: "#1d1d1f"
   ink-secondary: "#6e6e73"
   ink-tertiary: "#8e8e93"
-  ground-dark: "#000000"
-  surface-dark: "#1c1c1e"
-  ink-dark: "#f5f5f7"
+  ground-dark: "#161618"
+  surface-dark: "#232326"
+  ink-dark: "#ececef"
   ink-secondary-dark: "#a1a1a6"
+  switch-shadow: "rgb(0 0 0 / 0.12)"
+  fill: "rgba(118, 118, 128, 0.1)"
+  fill-strong: "rgba(118, 118, 128, 0.18)"
+  fill-dark: "rgba(118, 118, 128, 0.2)"
+  fill-strong-dark: "rgba(118, 118, 128, 0.32)"
   danger: "#c4161c"
   danger-dark: "#ff6b63"
   go: "#248a3d"
-  go-dark: "#4cd471"
+  go-dark: "#4fb873"
   task-indigo: "#5754d0"
   task-amber: "#b26a00"
   task-green: "#2f8a4f"
@@ -62,7 +67,33 @@ typography:
     fontFamily: "Host Grotesk, system-ui, sans-serif"
     fontSize: "13px"
     fontWeight: 400
+  lede:
+    fontFamily: "Host Grotesk, system-ui, sans-serif"
+    fontSize: "17px"
+    fontWeight: 400
+    lineHeight: 1.4
+  stat:
+    fontFamily: "Host Grotesk, system-ui, sans-serif"
+    fontSize: "26px"
+    fontWeight: 600
+    letterSpacing: "-0.03em"
+  ring-count-phone:
+    fontFamily: "Host Grotesk, system-ui, sans-serif"
+    fontSize: "36px"
+    fontWeight: 600
+  small:
+    fontFamily: "Host Grotesk, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+  micro:
+    fontFamily: "Host Grotesk, system-ui, sans-serif"
+    fontSize: "11.5px"
+    fontWeight: 550
+  code:
+    fontFamily: "ui-monospace, Cascadia Mono, Consolas, monospace"
+    fontSize: "0.92em"
 rounded:
+  code: "6px"
   field: "10px"
   icon: "11px"
   group: "16px"
@@ -109,18 +140,18 @@ the top bar pins either one on that device.
 - One segmented progress ring, one segment per task, filled in the task's own colour.
 - Tasks live in one grouped list with hairline separators, never as separate cards.
 - Primary actions are ink pills (black on light, white on dark); secondary actions are quiet text buttons.
-- History is monochrome: completion is drawn as ink density, not colour.
+- History uses one calm green ramp for completion; joker days get an amber ring.
 
 ## Colors
 
 Neutral greys carry the page; muted jewel tints identify tasks and nothing else.
 
 ### Primary
-- **Ink** (#1d1d1f light / #f5f5f7 dark): text, primary buttons, today's calendar ring, completed calendar days.
+- **Ink** (#1d1d1f light / #ececef dark): text, primary buttons, today's calendar ring.
 
 ### Neutral
-- **Ground** (#f5f5f7 / #000000): page background.
-- **Surface** (#ffffff / #1c1c1e): grouped lists and panels.
+- **Ground** (#f5f5f7 / #161618 graphite, never pure black): page background.
+- **Surface** (#ffffff / #232326): grouped lists and panels.
 - **Secondary ink** (#6e6e73 / #a1a1a6): details, hints, labels, quiet buttons.
 - **Fills** (rgb(118 118 128) at 10–32%): pill backgrounds, inputs, ring track, hover states.
 
@@ -130,11 +161,12 @@ custom tasks. Each tint appears as a 14% chip behind the task icon, the icon its
 timer, the input caret and focus ring, and the task's ring segment. Dark mode uses lighter variants of the same hues.
 
 ### State
-- **Danger** (#c4161c / #ff6b63): errors and the "Gesperrt" dot. **Go** (#248a3d / #4cd471): the "Frei" dot.
+- **Danger** (#c4161c / #ff6b63): errors and the "Gesperrt" dot. **Go** (#248a3d / #4fb873): the "Frei" dot and the
+  calendar's completion ramp.
 
 ### Named Rules
-**The Task Owns Its Colour Rule.** A tint only ever marks its own task. Navigation, buttons, history and chrome stay
-neutral.
+**The Task Owns Its Colour Rule.** A tint only ever marks its own task. Navigation, buttons and chrome stay neutral;
+the calendar uses the state green, never a task tint.
 
 **The No Teal Rule.** Turquoise and teal are out; the owner rejected them explicitly.
 
@@ -161,7 +193,7 @@ phone's WebView.
 ## Elevation & Depth
 
 Mostly tonal: white surfaces on a light grey ground. In light mode lists and panels carry one soft ambient shadow
-(`0 1px 2px rgb(0 0 0 / .04), 0 6px 20px -8px rgb(0 0 0 / .08)`); in dark mode none, the graphite surface on black is
+(`0 1px 2px rgb(0 0 0 / .04), 0 6px 20px -8px rgb(0 0 0 / .08)`); in dark mode none, the lighter surface on the graphite ground is
 enough. Never a border and a shadow together.
 
 ## Shapes
@@ -180,7 +212,7 @@ site links and the theme switch. Circles for checks and calendar days.
 - **Check:** 26px circle with a 1.75px inset ring; done fills with the tint and pops once; excused (joker) fills with
   35% tint.
 - **History panel:** three stats (Serie, Rekord, Woche), a week footnote, then the month calendar with completion as
-  ink density, joker days as an outlined circle with a dot, today as an ink ring.
+  a green ramp (16/32/55/100%), joker days as an amber ring, today as an ink ring.
 
 ## Do's and Don'ts
 
@@ -189,4 +221,4 @@ site links and the theme switch. Circles for checks and calendar days.
 - Do test both themes and a 390px width before shipping a change.
 - Don't add cards around individual tasks or nest panels.
 - Don't put a label or badge above the main heading.
-- Don't reintroduce teal or a coloured page background.
+- Don't reintroduce teal, a coloured page background or pure black in dark mode.
