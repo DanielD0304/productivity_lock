@@ -10,6 +10,8 @@ PORT = 47615
 BASE_URL = f"http://127.0.0.1:{PORT}"
 ALLOWED_HOSTS = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
 SAME_ORIGINS = {f"http://{host}" for host in ALLOWED_HOSTS}
+# The extension's ID is fixed by the "key" in extension/manifest.json; other extensions are refused.
+EXTENSION_ORIGIN = "chrome-extension://iffidaehabffcfgopiclobadkcmlkeml"
 MAX_BODY_BYTES = 10_000
 PHONE_PORT = 47616
 TOKEN_COOKIE = "plock_token"
@@ -47,7 +49,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _origin_allowed(self):
         origin = self.headers.get("Origin")
-        return origin is None or origin in SAME_ORIGINS or origin.startswith("chrome-extension://")
+        return origin is None or origin in SAME_ORIGINS or origin == EXTENSION_ORIGIN
 
     def _token_ok(self):
         sent = self.headers.get("Authorization", "").removeprefix("Bearer ").strip()
@@ -133,7 +135,13 @@ class Handler(BaseHTTPRequestHandler):
         status["phone"] = self.server.phone
 
     def do_POST(self):
-        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self._send_json(400, {"error": "Ungültige Länge"})
+            return
         # Read the body even before refusing: unread data makes Windows reset the connection.
         raw = self.rfile.read(length) if length <= MAX_BODY_BYTES else b""
         if not self._request_allowed():

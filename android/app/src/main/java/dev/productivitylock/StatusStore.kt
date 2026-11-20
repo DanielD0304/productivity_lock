@@ -38,6 +38,25 @@ object StatusStore {
         return address
     }
 
+    /** Same scheme, host and port; a prefix test would let "http://100.1.2.3:47616@evil.example" through. */
+    fun sameServer(url: Uri, address: String): Boolean {
+        val server = Uri.parse(address)
+        return url.scheme == server.scheme && url.host.equals(server.host, ignoreCase = true) &&
+            effectivePort(url) == effectivePort(server)
+    }
+
+    private fun effectivePort(uri: Uri): Int = when {
+        uri.port != -1 -> uri.port
+        uri.scheme == "https" -> 443
+        else -> 80
+    }
+
+    /** Tailscale hands out addresses from 100.64.0.0/10. */
+    fun isTailscaleAddress(host: String): Boolean {
+        val parts = host.split('.').map { it.toIntOrNull() ?: return false }
+        return parts.size == 4 && parts[0] == 100 && parts[1] in 64..127 && parts.all { it in 0..255 }
+    }
+
     fun save(context: Context, address: String, token: String) {
         prefs(context).edit()
             .putString("address", normalizeAddress(address))

@@ -1,5 +1,6 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtL2AUTtfTHMoZWhEgK14XfKqe78oF908tAEpUpTeJBBeEVVm+iInHaxZoTg5pXe9RYpPQevQAewqkstuD27DsObuUdmYYzSZNbySGgAJlzxi19tU8Dg4vyyLTaAVtJYRmx5SGwLewo5GqQMpZzmHfPCNHuppyfgfzq7FJu1DRfTrU8o46Kby1lELaj/YdIYMBj4xfo6NW7CeCtalBSivkMPXkZw3GJMoMEjXhKh05QJOqiFdL/M0xhW4i3HpFASabVRCN+Buz/bmJ5kc/lCaCWVvbONN91WXKjghkhfA2xAVh1SPM8ZYKtEfVNNcihpW7eXCCtBg59jl4eqofa+rxQIDAQAB",
   "name": "Productivity Lock",
   "version": "1.1.0",
   "description": "Sperrt YouTube, Netflix und Instagram, bis die Aufgaben für heute erledigt sind.",

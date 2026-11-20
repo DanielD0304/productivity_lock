@@ -20,6 +20,9 @@ Der Tag beginnt wie in Anki um 4 Uhr. Erledigtes bleibt bis dahin erledigt. Die 
    3. „Entpackte Erweiterung laden“ wählen und den Ordner `extension` auswählen.
    4. In den Details der Erweiterung „In InPrivate zulassen“ bzw. „Im Inkognito-Modus zulassen“ einschalten.
 
+   Die Erweiterung hat über `key` in `manifest.json` eine feste ID. Der Dienst nimmt nur Anfragen von ihr an, andere
+   Erweiterungen werden abgewiesen.
+
 Abschalten: `powershell -ExecutionPolicy Bypass -File .\uninstall_autostart.ps1` und die Erweiterung entfernen.
 
 ## Was als erledigt zählt
@@ -139,7 +142,8 @@ Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus
 3. Die APK bauen (`android\gradlew.bat -p android assembleRelease`) oder die fertige nehmen:
    `android\app\build\outputs\apk\release\app-release.apk`. Aufs Handy kopieren und installieren
    („Unbekannte Apps installieren“ erlauben).
-4. Am PC koppeln und den QR-Code mit der Handy-Kamera scannen. Klappt das nicht, Adresse und Token von Hand eintragen.
+4. Am PC koppeln und den QR-Code mit der Handy-Kamera scannen. Die App zeigt die Adresse und verbindet erst nach
+   deiner Bestätigung. Klappt das nicht, Adresse und Token von Hand eintragen.
 
    ```powershell
    python -m app.phone

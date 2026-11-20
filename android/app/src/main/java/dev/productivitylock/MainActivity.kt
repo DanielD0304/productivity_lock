@@ -2,9 +2,11 @@ package dev.productivitylock
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
@@ -55,17 +57,35 @@ class MainActivity : Activity() {
     private fun handle(intent: Intent) {
         val data = intent.data
         if (data?.scheme == "productivitylock" && data.host == "pair") {
+            // Handled once; a rotation must not ask again.
+            intent.data = null
             val address = data.getQueryParameter("url").orEmpty()
             val token = data.getQueryParameter("token").orEmpty()
-            if (address.isNotEmpty() && token.isNotEmpty()) {
-                StatusStore.save(this, address, token)
-                Toast.makeText(this, "Mit dem PC verbunden", Toast.LENGTH_SHORT).show()
-            }
+            if (address.isNotEmpty() && token.isNotEmpty()) confirmPairing(address, token)
         }
         if (intent.getBooleanExtra(EXTRA_BLOCKED, false)) {
             Toast.makeText(this, "Gesperrt, bis die Aufgaben von heute erledigt sind", Toast.LENGTH_LONG).show()
         }
         if (StatusStore.isConfigured(this)) showChecklist() else showSetup()
+    }
+
+    /** A pairing link can come from any web page, so it only takes effect after a look at the address. */
+    private fun confirmPairing(rawAddress: String, token: String) {
+        val address = StatusStore.normalizeAddress(rawAddress)
+        val host = Uri.parse(address).host.orEmpty()
+        val warning = if (StatusStore.isTailscaleAddress(host)) "" else
+            "\n\nAchtung: Das ist keine Tailscale-Adresse (100.x.y.z). Verbinde nur, wenn du den Link selbst am PC erzeugt hast."
+        AlertDialog.Builder(this)
+            .setTitle("Mit diesem PC verbinden?")
+            .setMessage("$address$warning")
+            .setPositiveButton("Verbinden") { _, _ ->
+                StatusStore.save(this, address, token)
+                Toast.makeText(this, "Mit dem PC verbunden", Toast.LENGTH_SHORT).show()
+                webView = null
+                showChecklist()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun serviceEnabled(): Boolean {
@@ -159,7 +179,7 @@ class MainActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // The checklist stays in the app; its links (LeetCode, YouTube …) open outside.
-                    if (request.url.toString().startsWith(address)) return false
+                    if (StatusStore.sameServer(request.url, address)) return false
                     runCatching { startActivity(Intent(Intent.ACTION_VIEW, request.url)) }
                     return true
                 }
@@ -168,7 +188,10 @@ class MainActivity : Activity() {
                     if (request.isForMainFrame) view.loadDataWithBaseURL(null, offlinePage(address), "text/html", "utf-8", null)
                 }
             }
-            CookieManager.getInstance().setCookie(address, "plock_token=${StatusStore.token(this@MainActivity)}; Path=/")
+            // HttpOnly keeps it from page scripts; Lax keeps other sites from sending it. Secure needs HTTPS.
+            CookieManager.getInstance().setCookie(
+                address, "plock_token=${StatusStore.token(this@MainActivity)}; Path=/; HttpOnly; SameSite=Lax",
+            )
             CookieManager.getInstance().flush()
             loadUrl("$address/")
         }

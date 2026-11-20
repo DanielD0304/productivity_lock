@@ -1,7 +1,9 @@
 package dev.productivitylock
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
 
@@ -27,6 +29,17 @@ class StatusStoreTest {
         assertNull(StatusStore.blockedSite("google.com/search?q=reddit.com", sites))
         assertNull(StatusStore.blockedSite("", sites))
         assertNull(StatusStore.blockedSite(null, sites))
+    }
+
+    @Test
+    fun onlyTailscaleAddressesCountAsTailscale() {
+        assertTrue(StatusStore.isTailscaleAddress("100.101.102.103"))
+        assertTrue(StatusStore.isTailscaleAddress("100.64.0.1"))
+        assertFalse(StatusStore.isTailscaleAddress("100.63.0.1"))
+        assertFalse(StatusStore.isTailscaleAddress("100.128.0.1"))
+        assertFalse(StatusStore.isTailscaleAddress("192.168.0.10"))
+        assertFalse(StatusStore.isTailscaleAddress("evil.example"))
+        assertFalse(StatusStore.isTailscaleAddress("100.101.102"))
     }
 
     @Test

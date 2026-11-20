@@ -1,4 +1,7 @@
+import base64
 import datetime as dt
+import hashlib
+import http.client
 import json
 import os
 import shutil
@@ -17,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import chats, checks, history, phone, tray
 from app.enforcer import Enforcer, kill_process, run_loop, running_processes
+from app import server as server_module
 from app.server import LockServer
 from app.service import LockService, build_tasks
 
@@ -1045,9 +1049,34 @@ class ServerTest(unittest.TestCase):
         self.assertFalse(json.loads(body)["unlocked"])
 
     def test_extension_origin_gets_cors(self):
-        origin = "chrome-extension://abc"
+        origin = server_module.EXTENSION_ORIGIN
         _, _, headers = self.request("/status", origin=origin)
         self.assertEqual(headers["Access-Control-Allow-Origin"], origin)
+
+    def test_other_extension_is_refused(self):
+        code, _, _ = self.request("/chats/lernchat/start", method="POST", body={}, origin="chrome-extension://other")
+        self.assertEqual(code, 403)
+        self.assertEqual(self.launches, [])
+        self.assertEqual(self.request("/status", origin="chrome-extension://other")[0], 403)
+
+    def test_extension_id_matches_manifest_key(self):
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
+        with open(os.path.join(root, "manifest.json"), encoding="utf-8") as file:
+            key = base64.b64decode(json.load(file)["key"])
+        digest = hashlib.sha256(key).hexdigest()[:32]
+        extension_id = "".join(chr(ord("a") + int(char, 16)) for char in digest)
+        self.assertEqual(server_module.EXTENSION_ORIGIN, f"chrome-extension://{extension_id}")
+
+    def test_bad_content_length_returns_400(self):
+        for value in ("-1", "abc"):
+            connection = http.client.HTTPConnection("127.0.0.1", self.PORT, timeout=5)
+            connection.putrequest("POST", "/tasks/reading/start", skip_accept_encoding=True)
+            connection.putheader("Host", "127.0.0.1:47615")
+            connection.putheader("Content-Length", value)
+            connection.endheaders()
+            self.assertEqual(connection.getresponse().status, 400)
+            connection.close()
+        self.assertEqual(self.service.status()["checks"]["reading"]["state"], "idle")
 
     def test_foreign_website_is_refused(self):
         code, _, _ = self.request("/tasks/reading/start", method="POST", body={}, origin="https://evil.example")
