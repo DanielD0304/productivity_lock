@@ -1,4 +1,5 @@
-const API = "http://127.0.0.1:47615";
+// Served by the service (PC or phone) the page asks its own origin; inside the extension it asks the PC.
+const API = location.protocol.startsWith("http") ? location.origin : "http://127.0.0.1:47615";
 const POLL_MS = 3000;
 const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];

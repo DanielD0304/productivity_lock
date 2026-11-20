@@ -15,7 +15,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import chats, checks, history, tray
+from app import chats, checks, history, phone, tray
 from app.enforcer import Enforcer, kill_process, run_loop, running_processes
 from app.server import LockServer
 from app.service import LockService, build_tasks
@@ -1111,6 +1111,110 @@ class ServerTest(unittest.TestCase):
     def test_second_instance_cannot_bind(self):
         with self.assertRaises(OSError):
             LockServer(self.service, ".", port=self.PORT)
+
+
+class PhoneServerTest(unittest.TestCase):
+    PORT = 47698
+    TOKEN = "geheim-123"
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        ready = {"done": False, "detail": "offen", "error": None}
+        config = {**CONFIG, "lernchat": {"per_week": 3, "min_score": 0}}
+        self.service = LockService(config, self.dir, anki_check=lambda now: ready,
+                                   leetcode_check=lambda user, start: ready)
+        static = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
+        self.launches = []
+        self.server = LockServer(self.service, static, port=self.PORT, launchers={"lernchat": self},
+                                 token=self.TOKEN, phone={"blocked_apps": ["com.example"]})
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+
+    def start(self):
+        self.launches.append(1)
+
+    def request(self, path, method="GET", body=None, token=TOKEN, cookie=False, origin=None):
+        request = urllib.request.Request(f"http://127.0.0.1:{self.PORT}{path}", method=method,
+                                         data=json.dumps(body).encode() if body is not None else None)
+        request.add_header("Host", f"100.64.0.1:{self.PORT}")
+        if token and cookie:
+            request.add_header("Cookie", f"other=1; plock_token={token}")
+        elif token:
+            request.add_header("Authorization", f"Bearer {token}")
+        if origin:
+            request.add_header("Origin", origin)
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return response.status, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.read()
+
+    def test_without_token_is_refused(self):
+        self.assertEqual(self.request("/status", token=None)[0], 403)
+        self.assertEqual(self.request("/", token=None)[0], 403)
+        self.assertEqual(self.request("/status", token="falsch")[0], 403)
+
+    def test_token_by_header_or_cookie(self):
+        self.assertEqual(self.request("/status")[0], 200)
+        self.assertEqual(self.request("/", cookie=True)[0], 200)
+
+    def test_status_carries_phone_settings_and_day_rule(self):
+        status = json.loads(self.request("/status")[1])
+        self.assertEqual(status["phone"], {"blocked_apps": ["com.example"]})
+        self.assertEqual(status["rollover_hour"], 4)
+        self.assertFalse(status["unlocked"])
+
+    def test_chats_cannot_be_started_from_the_phone(self):
+        status = json.loads(self.request("/status")[1])
+        self.assertNotIn("action_path", status["checks"]["lernchat"])
+        self.assertEqual(self.request("/chats/lernchat/start", method="POST", body={})[0], 404)
+        self.assertEqual(self.launches, [])
+
+    def test_timer_and_joker_work_from_the_phone(self):
+        self.assertEqual(self.request("/tasks/reading/start", method="POST", body={})[0], 200)
+        code, body = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"})
+        self.assertEqual(code, 200)
+        self.assertTrue(json.loads(body)["active"])
+
+    def test_foreign_page_cannot_ride_the_cookie(self):
+        code, _ = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"}, cookie=True,
+                               origin="https://evil.example")
+        self.assertEqual(code, 403)
+        self.assertFalse(self.service.status()["checks"]["anki"]["joker"]["active"])
+
+
+class PhoneSetupTest(unittest.TestCase):
+    def test_token_is_created_once(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        token = phone.load_token(folder)
+        self.assertGreaterEqual(len(token), 20)
+        self.assertEqual(phone.load_token(folder), token)
+
+    def test_waits_for_tailscale_then_serves(self):
+        calls = []
+        ips = iter([None, None, "127.0.0.1"])
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        with mock.patch.object(phone, "LockServer") as server:
+            phone.serve_phone("svc", "static", {"phone": {"port": 1}}, folder,
+                              find_ip=lambda: next(ips), sleep=calls.append)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(server.call_args.kwargs["host"], "127.0.0.1")
+        server.return_value.serve_forever.assert_called_once()
+
+    def test_can_be_switched_off(self):
+        with mock.patch.object(phone, "LockServer") as server:
+            phone.serve_phone("svc", "static", {"phone": {"enabled": False}}, "unused",
+                              find_ip=lambda: "127.0.0.1", sleep=lambda s: None)
+        server.assert_not_called()
+
+    def test_tailscale_ip_picks_the_ipv4(self):
+        result = mock.Mock(stdout="fd7a::1\n100.101.102.103\n")
+        with mock.patch.object(phone.shutil, "which", return_value="tailscale"):
+            self.assertEqual(phone.tailscale_ip(run=lambda *a, **k: result), "100.101.102.103")
 
 
 if __name__ == "__main__":

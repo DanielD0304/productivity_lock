@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Productivity Lock</string>
+    <string name="service_name">Productivity Lock</string>
+    <string name="service_description">Schließt YouTube, Instagram, Netflix und Wild Rift, bis die Aufgaben des Tages erledigt sind. Die App sieht nur, welche App gerade geöffnet wird, keine Inhalte.</string>
+</resources>

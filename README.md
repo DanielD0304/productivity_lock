@@ -125,6 +125,34 @@ stehen im Format `HH:MM`.
 - **Karten bringen Wörter, Texte bringen Sprache.** Lesen in der Zielsprache zählt auch für den Lese-Timer und
   verankert die Wörter im Zusammenhang.
 
+## Handy-App (Android)
+
+Die App sperrt YouTube, Instagram, Netflix und Wild Rift auf dem Handy, bis die Aufgaben des Tages erledigt sind, und
+zeigt dieselbe Checkliste wie am PC. Lese-Timer, Notizen und Joker gehen auch am Handy. Chats startest du weiter am PC.
+Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus, gilt der letzte bekannte Stand, und ab
+4 Uhr ist wieder gesperrt, bis der PC etwas anderes meldet.
+
+1. Tailscale auf PC und Handy installieren und mit demselben Konto anmelden.
+2. Den Dienst neu starten. Er öffnet den Handy-Zugang auf Port 47616, nur auf der Tailscale-Adresse und nur mit Token.
+   Fragt die Windows-Firewall nach, den Zugriff erlauben.
+3. Die APK bauen (`android\gradlew.bat -p android assembleRelease`) oder die fertige nehmen:
+   `android\app\build\outputs\apk\release\app-release.apk`. Aufs Handy kopieren und installieren
+   („Unbekannte Apps installieren“ erlauben).
+4. Am PC koppeln und den QR-Code mit der Handy-Kamera scannen. Klappt das nicht, Adresse und Token von Hand eintragen.
+
+   ```powershell
+   python -m app.phone
+   ```
+
+5. Die Sperre einschalten: Einstellungen → Bedienungshilfen → Productivity Lock. Ist der Schalter ausgegraut
+   (Android 13 und neuer), zuerst unter Einstellungen → Apps → Productivity Lock oben rechts im Menü
+   „Eingeschränkte Einstellungen zulassen“ wählen.
+
+Welche Apps gesperrt sind, steht in `config.json` unter `phone.blocked_apps` (Paketnamen), und der Handy-Zugang lässt
+sich mit `"phone": {"enabled": false}` abschalten. Das Token liegt in `data/phone_token.txt`. Löschst du es, entsteht
+beim nächsten Start ein neues, und das Handy muss neu koppeln. YouTube und Instagram im Handy-Browser sperrt die App
+nicht, und wer die Bedienungshilfe abschaltet, hebt die Sperre auf.
+
 ## Tests
 
 ```powershell

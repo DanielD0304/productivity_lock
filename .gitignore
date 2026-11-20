@@ -3,3 +3,9 @@ data/
 __pycache__/
 *.pyc
 extension/_metadata/
+
+# Android-Build
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

@@ -8,6 +8,7 @@ import time
 
 from app.enforcer import Enforcer, run_loop
 from app.chats import CHATS, DesktopLauncher, Launcher
+from app.phone import serve_phone
 from app.server import BASE_URL, LockServer
 from app.service import LockService
 from app.tray import run_tray
@@ -48,6 +49,11 @@ def main():
     threading.Thread(
         target=run_loop,
         args=(service, enforcer, BASE_URL + "/", args.dry_run, time.monotonic),
+        daemon=True,
+    ).start()
+    threading.Thread(
+        target=serve_phone,
+        args=(service, os.path.join(ROOT, "extension"), config, args.data_dir),
         daemon=True,
     ).start()
     if not args.dry_run:
