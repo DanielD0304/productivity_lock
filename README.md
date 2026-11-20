@@ -1,6 +1,6 @@
 # Productivity Lock
 
-Sperrt YouTube, Netflix, Instagram und League of Legends, bis für heute Anki, LeetCode und Lesen erledigt sind.
+Sperrt YouTube, Netflix, Instagram, LinkedIn, Reddit und League of Legends, bis für heute Anki, LeetCode und Lesen erledigt sind.
 Der Tag beginnt wie in Anki um 4 Uhr. Erledigtes bleibt bis dahin erledigt. Die Checkliste liegt unter
 <http://127.0.0.1:47615/>.
 
@@ -127,7 +127,8 @@ stehen im Format `HH:MM`.
 
 ## Handy-App (Android)
 
-Die App sperrt YouTube, Instagram, Netflix und Wild Rift auf dem Handy, bis die Aufgaben des Tages erledigt sind, und
+Die App sperrt YouTube, Instagram, Netflix, LinkedIn, Reddit und Wild Rift auf dem Handy, als App und als Webseite im
+Browser, bis die Aufgaben des Tages erledigt sind, und
 zeigt dieselbe Checkliste wie am PC. Lese-Timer, Notizen und Joker gehen auch am Handy. Chats startest du weiter am PC.
 Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus, gilt der letzte bekannte Stand, und ab
 4 Uhr ist wieder gesperrt, bis der PC etwas anderes meldet.
@@ -148,10 +149,12 @@ Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus
    (Android 13 und neuer), zuerst unter Einstellungen → Apps → Productivity Lock oben rechts im Menü
    „Eingeschränkte Einstellungen zulassen“ wählen.
 
-Welche Apps gesperrt sind, steht in `config.json` unter `phone.blocked_apps` (Paketnamen), und der Handy-Zugang lässt
-sich mit `"phone": {"enabled": false}` abschalten. Das Token liegt in `data/phone_token.txt`. Löschst du es, entsteht
-beim nächsten Start ein neues, und das Handy muss neu koppeln. YouTube und Instagram im Handy-Browser sperrt die App
-nicht, und wer die Bedienungshilfe abschaltet, hebt die Sperre auf.
+Welche Apps gesperrt sind, steht in `config.json` unter `phone.blocked_apps` (Paketnamen), welche Webseiten unter
+`phone.blocked_sites`. Webseiten erkennt die App an der Adresszeile von Chrome, Firefox, Edge, Brave, Samsung Internet,
+Opera, DuckDuckGo, Vivaldi und Kiwi. In anderen Browsern und in Apps, die Seiten selbst anzeigen, greift das nicht. Der
+Handy-Zugang lässt sich mit `"phone": {"enabled": false}` abschalten. Das Token liegt in `data/phone_token.txt`.
+Löschst du es, entsteht beim nächsten Start ein neues, und das Handy muss neu koppeln. Wer die Bedienungshilfe
+abschaltet, hebt die Sperre auf.
 
 ## Tests
 

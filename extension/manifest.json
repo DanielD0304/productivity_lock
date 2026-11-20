@@ -10,7 +10,11 @@
     "*://youtu.be/*",
     "*://*.youtube-nocookie.com/*",
     "*://*.netflix.com/*",
-    "*://*.instagram.com/*"
+    "*://*.instagram.com/*",
+    "*://*.linkedin.com/*",
+    "*://lnkd.in/*",
+    "*://*.reddit.com/*",
+    "*://*.redd.it/*"
   ],
   "background": {
     "service_worker": "background.js"

@@ -804,7 +804,7 @@ class ExtensionFilesTest(unittest.TestCase):
             permissions = json.load(file)["host_permissions"]
         with open(os.path.join(root, "background.js"), encoding="utf-8") as file:
             background = file.read()
-        for domain in ("youtube.com", "netflix.com", "instagram.com"):
+        for domain in ("youtube.com", "netflix.com", "instagram.com", "linkedin.com", "reddit.com"):
             for rule in rules:
                 self.assertIn(domain, rule["condition"]["requestDomains"])
             self.assertIn(f"*://*.{domain}/*", permissions)
@@ -1204,6 +1204,13 @@ class PhoneSetupTest(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(server.call_args.kwargs["host"], "127.0.0.1")
         server.return_value.serve_forever.assert_called_once()
+
+    def test_linkedin_and_reddit_are_blocked_by_default(self):
+        settings = phone.phone_settings({})
+        self.assertIn("com.linkedin.android", settings["blocked_apps"])
+        self.assertIn("com.reddit.frontpage", settings["blocked_apps"])
+        for site in ("instagram.com", "linkedin.com", "reddit.com"):
+            self.assertIn(site, settings["blocked_sites"])
 
     def test_can_be_switched_off(self):
         with mock.patch.object(phone, "LockServer") as server:

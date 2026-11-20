@@ -16,6 +16,12 @@ object StatusStore {
         "com.instagram.android",
         "com.netflix.mediaclient",
         "com.riotgames.league.wildrift",
+        "com.linkedin.android",
+        "com.reddit.frontpage",
+    )
+    val DEFAULT_SITES = setOf(
+        "youtube.com", "youtu.be", "netflix.com", "instagram.com",
+        "linkedin.com", "lnkd.in", "reddit.com", "redd.it",
     )
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -75,8 +81,21 @@ object StatusStore {
         return status.optString("day") == logicalDay(status.optInt("rollover_hour", 4), now)
     }
 
-    fun blockedApps(status: JSONObject?): Set<String> {
-        val list = status?.optJSONObject("phone")?.optJSONArray("blocked_apps") ?: return DEFAULT_BLOCKED
+    fun blockedApps(status: JSONObject?): Set<String> = phoneList(status, "blocked_apps") ?: DEFAULT_BLOCKED
+
+    fun blockedSites(status: JSONObject?): Set<String> = phoneList(status, "blocked_sites") ?: DEFAULT_SITES
+
+    private fun phoneList(status: JSONObject?, key: String): Set<String>? {
+        val list = status?.optJSONObject("phone")?.optJSONArray(key) ?: return null
         return (0 until list.length()).map { list.getString(it) }.toSet()
+    }
+
+    /** The blocked site an address bar shows, if any: "m.instagram.com/p/x" matches "instagram.com". */
+    fun blockedSite(addressBar: String?, sites: Set<String>): String? {
+        val text = addressBar?.trim()?.lowercase() ?: return null
+        if (text.isEmpty() || text.contains(' ')) return null // A search, not an address.
+        val host = text.substringAfter("://").substringBefore('/').substringBefore('?')
+            .substringBefore('#').substringBefore(':')
+        return sites.firstOrNull { host == it || host.endsWith(".$it") }
     }
 }

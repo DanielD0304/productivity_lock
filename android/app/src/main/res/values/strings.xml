@@ -2,5 +2,5 @@
 <resources>
     <string name="app_name">Productivity Lock</string>
     <string name="service_name">Productivity Lock</string>
-    <string name="service_description">Schließt YouTube, Instagram, Netflix und Wild Rift, bis die Aufgaben des Tages erledigt sind. Die App sieht nur, welche App gerade geöffnet wird, keine Inhalte.</string>
+    <string name="service_description">Schließt YouTube, Instagram, Netflix, LinkedIn, Reddit und Wild Rift, bis die Aufgaben des Tages erledigt sind, auch als Webseite im Browser. Die App liest dafür nur, welche App offen ist, und im Browser die Adresszeile. Sie speichert und sendet nichts davon.</string>
 </resources>

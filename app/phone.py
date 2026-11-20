@@ -21,6 +21,13 @@ DEFAULT_BLOCKED_APPS = [
     "com.instagram.android",
     "com.netflix.mediaclient",
     "com.riotgames.league.wildrift",
+    "com.linkedin.android",
+    "com.reddit.frontpage",
+]
+# Checked against the address bar of the phone's browsers; subdomains (m., www.) count too.
+DEFAULT_BLOCKED_SITES = [
+    "youtube.com", "youtu.be", "netflix.com", "instagram.com",
+    "linkedin.com", "lnkd.in", "reddit.com", "redd.it",
 ]
 
 
@@ -60,6 +67,7 @@ def phone_settings(config):
         "host": phone.get("host", "auto"),
         "port": phone.get("port", PHONE_PORT),
         "blocked_apps": phone.get("blocked_apps", DEFAULT_BLOCKED_APPS),
+        "blocked_sites": phone.get("blocked_sites", DEFAULT_BLOCKED_SITES),
     }
 
 
@@ -75,7 +83,8 @@ def serve_phone(service, static_dir, config, data_dir, find_ip=tailscale_ip, sle
         if host:
             try:
                 server = LockServer(service, static_dir, port=settings["port"], host=host, token=token,
-                                    phone={"blocked_apps": settings["blocked_apps"]})
+                                    phone={"blocked_apps": settings["blocked_apps"],
+                                           "blocked_sites": settings["blocked_sites"]})
             except OSError as error:
                 logging.warning("Handy-Zugang auf %s:%s nicht möglich: %s", host, settings["port"], error)
             else:
