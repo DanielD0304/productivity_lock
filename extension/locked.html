@@ -4,79 +4,146 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Productivity Lock</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..700&display=swap">
   <link rel="stylesheet" href="locked.css">
 </head>
 <body>
-  <main>
-    <p class="eyebrow" id="progress">Wird geprüft …</p>
-    <h1 id="title">Erst lernen, dann der Rest.</h1>
-
-    <p class="banner" id="offline" hidden>
-      Der Lock-Dienst läuft nicht, deshalb bleibt alles gesperrt. Starte den PC neu oder führe
-      <code>install_autostart.ps1</code> aus.
-    </p>
-
-    <ul class="tasks" id="tasks"></ul>
-
-    <template id="task-template">
-      <li class="task">
-        <span class="mark" aria-hidden="true"></span>
-        <div class="grow">
-          <h2 class="task-title"></h2>
-          <p class="detail"></p>
-          <p class="error check-error" hidden></p>
-          <p class="hint hint-text" hidden></p>
-          <a class="hint hint-link" target="_blank" rel="noreferrer" hidden></a>
-          <button class="action" type="button" hidden></button>
-          <p class="error action-error" hidden></p>
-          <p class="timer" hidden></p>
-          <button class="quiet joker-open" type="button" hidden>Joker einsetzen</button>
-          <form class="joker-form" hidden>
-            <label class="joker-label">Warum brauchst du heute den Joker?</label>
-            <input class="joker-reason" type="text" maxlength="200" autocomplete="off">
-            <p class="error joker-error" hidden></p>
-            <button type="submit">Aufgabe erlassen</button>
-            <button class="quiet joker-cancel" type="button">Abbrechen</button>
-          </form>
-          <button class="start" type="button" hidden>Timer starten</button>
-          <form class="note-form" hidden>
-            <label class="note-label"></label>
-            <textarea class="note" rows="2" maxlength="1000"></textarea>
-            <p class="error note-error" hidden></p>
-            <button type="submit">Abschließen</button>
-          </form>
-        </div>
-      </li>
-    </template>
-
-    <div class="links" id="links" hidden>
-      <a class="primary" href="https://www.youtube.com/">YouTube öffnen</a>
-      <a class="primary" href="https://www.netflix.com/">Netflix öffnen</a>
-      <a class="primary" href="https://www.instagram.com/">Instagram öffnen</a>
-    </div>
-
-    <button class="quiet" id="refresh" type="button">Jetzt prüfen</button>
-
-    <section class="history" id="history" hidden>
-      <h2>Verlauf</h2>
-      <p class="stats"><strong id="streak"></strong> <span id="best"></span></p>
-      <p class="week" id="week"></p>
-      <div class="month-nav">
-        <button class="nav" id="month-prev" type="button" aria-label="Voriger Monat">‹</button>
-        <span id="month-label"></span>
-        <button class="nav" id="month-next" type="button" aria-label="Nächster Monat">›</button>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
+        </span>
+        <span class="brand-name">Productivity Lock</span>
+        <span class="state" id="state">Gesperrt</span>
       </div>
-      <div class="calendar" id="calendar"></div>
-      <ul class="legend">
-        <li><span class="swatch lv0"></span>Nichts</li>
-        <li><span class="swatch lv1"></span>Wenig</li>
-        <li><span class="swatch lv2"></span>Die Hälfte</li>
-        <li><span class="swatch lv3"></span>Fast alles</li>
-        <li><span class="swatch lv4"></span>Alles</li>
-        <li><span class="swatch joker-day"></span>Mit Joker</li>
-      </ul>
-    </section>
-  </main>
+      <div class="topbar-end">
+        <span class="date" id="date"></span>
+        <button class="ghost refresh" id="refresh" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+          Aktualisieren
+        </button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="primary" aria-labelledby="title">
+        <div class="intro">
+          <div class="intro-text">
+            <h1 id="title">Erst lernen, dann der Rest.</h1>
+            <p class="progress-line"><strong id="count-done">–</strong><span id="count-total"></span> <span id="progress">Wird geprüft …</span></p>
+          </div>
+          <div class="ring-wrap" aria-hidden="true">
+            <svg class="ring" id="ring" viewBox="0 0 200 200"></svg>
+          </div>
+        </div>
+
+        <p class="banner" id="offline" hidden>
+          Der Lock-Dienst läuft nicht, deshalb bleibt alles gesperrt. Starte den PC neu oder führe
+          <code>install_autostart.ps1</code> aus.
+        </p>
+
+        <div class="unlocked" id="links" hidden>
+          <p class="unlocked-text">Alles erledigt. Die Seiten sind wieder offen.</p>
+          <div class="unlocked-links">
+            <a class="pill-link" href="https://www.youtube.com/">YouTube</a>
+            <a class="pill-link" href="https://www.netflix.com/">Netflix</a>
+            <a class="pill-link" href="https://www.instagram.com/">Instagram</a>
+          </div>
+        </div>
+
+        <h2 class="section-title">Heute</h2>
+        <ul class="tasks" id="tasks"></ul>
+
+        <template id="task-template">
+          <li class="task">
+            <div class="row">
+              <span class="icon" aria-hidden="true"></span>
+              <div class="text">
+                <h3 class="task-title"></h3>
+                <p class="detail"></p>
+              </div>
+              <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M7 12.5l3.2 3.2L17 9"/></svg>
+              </span>
+            </div>
+            <div class="body">
+              <p class="error check-error" hidden></p>
+              <p class="hint hint-text" hidden></p>
+              <a class="hint hint-link" target="_blank" rel="noreferrer" hidden></a>
+              <p class="timer" hidden></p>
+              <div class="actions">
+                <button class="primary-btn action" type="button" hidden></button>
+                <button class="primary-btn start" type="button" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></svg>Timer starten
+                </button>
+                <button class="ghost joker-open" type="button" hidden>Joker einsetzen</button>
+              </div>
+              <p class="error action-error" hidden></p>
+              <form class="joker-form" hidden>
+                <label class="joker-label">Warum brauchst du heute den Joker?</label>
+                <input class="joker-reason" type="text" maxlength="200" autocomplete="off" placeholder="Kurz begründen">
+                <p class="error joker-error" hidden></p>
+                <div class="actions">
+                  <button class="primary-btn" type="submit">Aufgabe erlassen</button>
+                  <button class="ghost joker-cancel" type="button">Abbrechen</button>
+                </div>
+              </form>
+              <form class="note-form" hidden>
+                <label class="note-label"></label>
+                <textarea class="note" rows="3" maxlength="1000" placeholder="Ein, zwei Sätze"></textarea>
+                <p class="error note-error" hidden></p>
+                <div class="actions">
+                  <button class="primary-btn" type="submit">Abschließen</button>
+                </div>
+              </form>
+            </div>
+          </li>
+        </template>
+      </section>
+
+      <aside class="side" id="history" hidden>
+        <section class="panel stats" aria-label="Serie">
+          <div class="stat">
+            <span class="stat-label">Serie</span>
+            <strong id="streak"></strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Rekord</span>
+            <strong id="best"></strong>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Diese Woche</span>
+            <strong id="week-done"></strong>
+          </div>
+          <p class="footnote" id="week"></p>
+        </section>
+
+        <section class="panel calendar-panel" aria-label="Verlauf">
+          <div class="month-nav">
+            <h2 class="month-label" id="month-label"></h2>
+            <div class="month-buttons">
+              <button class="nav" id="month-prev" type="button" aria-label="Voriger Monat">
+                <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+              </button>
+              <button class="nav" id="month-next" type="button" aria-label="Nächster Monat">
+                <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="calendar" id="calendar"></div>
+          <ul class="legend">
+            <li><span class="swatch s4"></span>Alles</li>
+            <li><span class="swatch s2"></span>Teilweise</li>
+            <li><span class="swatch s0"></span>Nichts</li>
+            <li><span class="swatch sj"></span>Joker</li>
+          </ul>
+        </section>
+      </aside>
+    </main>
+  </div>
   <script src="locked.js"></script>
 </body>
 </html>
