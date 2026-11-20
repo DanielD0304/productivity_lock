@@ -3,6 +3,7 @@ import csv
 import logging
 import subprocess
 import threading
+import time
 import webbrowser
 
 LOOP_SECONDS = 3
@@ -10,13 +11,20 @@ LOCK_PAGE_COOLDOWN_SECONDS = 300
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
-def running_processes():
-    output = subprocess.run(
-        ["tasklist", "/FO", "CSV", "/NH"],
-        capture_output=True, text=True, encoding="mbcs", errors="replace",
-        creationflags=NO_WINDOW, check=True,
-    ).stdout
-    return {row[0].lower() for row in csv.reader(output.splitlines()) if row}
+def running_processes(attempts=3, delay=0.5):
+    # tasklist fails now and then with exit code 1; retry so one hiccup doesn't skip a whole tick.
+    for attempt in range(attempts):
+        try:
+            output = subprocess.run(
+                ["tasklist", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, encoding="mbcs", errors="replace",
+                creationflags=NO_WINDOW, check=True,
+            ).stdout
+            return {row[0].lower() for row in csv.reader(output.splitlines()) if row}
+        except subprocess.CalledProcessError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(delay)
 
 
 def kill_process(name):
