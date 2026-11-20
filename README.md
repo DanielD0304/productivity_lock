@@ -1,6 +1,6 @@
 # Productivity Lock
 
-Sperrt YouTube, Netflix, Instagram, LinkedIn, Reddit und League of Legends, bis für heute Anki, LeetCode und Lesen erledigt sind.
+Sperrt YouTube, Netflix, Instagram, LinkedIn, Reddit, League of Legends und World of Warcraft, bis für heute Anki, LeetCode und Lesen erledigt sind.
 Der Tag beginnt wie in Anki um 4 Uhr. Erledigtes bleibt bis dahin erledigt. Die Checkliste liegt unter
 <http://127.0.0.1:47615/>.
 

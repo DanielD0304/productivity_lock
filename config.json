@@ -40,7 +40,11 @@
     "LeagueClientUx.exe",
     "LeagueClientUxRender.exe",
     "LeagueCrashHandler64.exe",
-    "League of Legends.exe"
+    "League of Legends.exe",
+    "Wow.exe",
+    "WowClassic.exe",
+    "WowT.exe",
+    "WowB.exe"
   ],
   "game_process": "League of Legends.exe"
 }
