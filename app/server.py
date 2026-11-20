@@ -19,6 +19,9 @@ STATIC_FILES = {
     "/": ("locked.html", "text/html; charset=utf-8"),
     "/locked.js": ("locked.js", "text/javascript; charset=utf-8"),
     "/locked.css": ("locked.css", "text/css; charset=utf-8"),
+    "/theme.js": ("theme.js", "text/javascript; charset=utf-8"),
+    "/fonts/host-grotesk-latin.woff2": ("fonts/host-grotesk-latin.woff2", "font/woff2"),
+    "/fonts/host-grotesk-latin-ext.woff2": ("fonts/host-grotesk-latin-ext.woff2", "font/woff2"),
 }
 
 

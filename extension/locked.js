@@ -7,16 +7,18 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const $ = (id) => document.getElementById(id);
 const inExtension = Boolean(globalThis.chrome?.runtime?.id);
 
-// Each task gets an app-icon colour and glyph; unknown tasks fall back by kind, then by position.
+// Each task gets a colour and glyph; the colours are theme tokens, so light and dark each get their own shade.
+// Unknown tasks fall back by kind, then by position.
 const TASK_STYLE = {
-  anki: { tint: "#5e5ce6", icon: "cards" },
-  leetcode: { tint: "#ff9f0a", icon: "code" },
-  reading: { tint: "#30b0c7", icon: "book" },
-  lernchat: { tint: "#bf5af2", icon: "chat" },
-  sprachchat: { tint: "#ff375f", icon: "globe" },
+  anki: { tint: "var(--t-indigo)", icon: "cards" },
+  leetcode: { tint: "var(--t-amber)", icon: "code" },
+  reading: { tint: "var(--t-green)", icon: "book" },
+  lernchat: { tint: "var(--t-violet)", icon: "chat" },
+  sprachchat: { tint: "var(--t-rose)", icon: "globe" },
 };
 const KIND_ICON = { remote: "branch", timer: "clock", check: "check", chat: "chat", anki: "cards" };
-const FALLBACK_TINTS = ["#0a84ff", "#30d158", "#64d2ff", "#ff9f0a", "#ffd60a", "#ac8e68"];
+const FALLBACK_TINTS = ["var(--t-blue)", "var(--t-sand)", "var(--t-green)", "var(--t-amber)", "var(--t-violet)", "var(--t-graphite)"];
+const THEME_KEY = "plock-theme";
 const ICONS = {
   cards: '<rect x="4" y="7" width="12" height="13" rx="2.5"/><path d="M8 4h9.5A2.5 2.5 0 0 1 20 6.5V16"/>',
   code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/>',
@@ -177,9 +179,9 @@ function renderRing(ids, checks) {
   if (key !== ringKey) {
     ringKey = key;
     ring.replaceChildren();
-    const radius = 88;
+    const radius = 90;
     const circumference = 2 * Math.PI * radius;
-    const gap = ids.length > 1 ? 30 : 0; // Covers the round caps plus a visible gap.
+    const gap = ids.length > 1 ? 24 : 0; // Covers the round caps plus a visible gap.
     const length = Math.max(1, circumference / ids.length - gap);
     ids.forEach((id, index) => {
       const tint = $(`task-${id}`).dataset.tint;
@@ -197,15 +199,24 @@ function renderRing(ids, checks) {
   for (const id of ids) {
     const seg = $(`seg-${id}`);
     seg.setAttribute("stroke-dashoffset", checks[id].done ? 0 : seg.dataset.length);
+    seg.classList.toggle("empty", !checks[id].done); // An empty dash would still draw its round caps.
   }
 }
 
 function clearRing() {
-  for (const seg of document.querySelectorAll(".seg-fill")) seg.setAttribute("stroke-dashoffset", seg.dataset.length);
+  for (const seg of document.querySelectorAll(".seg-fill")) {
+    seg.setAttribute("stroke-dashoffset", seg.dataset.length);
+    seg.classList.add("empty");
+  }
 }
 
 function title(allDone) {
   return allDone ? "Geschafft. Viel Spaß!" : "Erst lernen, dann der Rest.";
+}
+
+function lede(open) {
+  if (open === 0) return "Alles erledigt für heute.";
+  return open === 1 ? "Noch eine Aufgabe, dann ist alles offen." : `Noch ${open} Aufgaben, dann ist alles offen.`;
 }
 
 function days(count) {
@@ -303,8 +314,8 @@ async function render(status) {
   const allDone = finished === checks.length;
   $("offline").hidden = true;
   $("count-done").textContent = finished;
-  $("count-total").textContent = ` von ${checks.length}`;
-  $("progress").textContent = "erledigt";
+  $("count-total").textContent = `von ${checks.length}`;
+  $("progress").textContent = lede(checks.length - finished);
   $("state").textContent = status.unlocked ? "Frei" : "Gesperrt";
   $("title").textContent = title(allDone);
   document.body.classList.toggle("unlocked", allDone);
@@ -329,8 +340,9 @@ async function refresh(force = false) {
     $("offline").hidden = false;
     $("count-done").textContent = "–";
     $("count-total").textContent = "";
-    $("progress").textContent = "Keine Verbindung";
+    $("progress").textContent = "Keine Verbindung zum Lock-Dienst.";
     $("state").textContent = "Gesperrt";
+    $("title").textContent = title(false);
     document.body.classList.remove("unlocked");
     clearRing();
     $("links").hidden = true;
@@ -358,6 +370,37 @@ $("refresh").addEventListener("click", async () => {
   setTimeout(() => button.classList.remove("spin"), 500);
 });
 $("month-prev").addEventListener("click", () => moveMonth(-1));
+
+// Light, dark or whatever the system says; the choice is remembered on this device.
+function applyTheme(choice) {
+  if (choice === "light" || choice === "dark") document.documentElement.dataset.theme = choice;
+  else delete document.documentElement.dataset.theme;
+  for (const button of document.querySelectorAll("[data-theme-choice]")) {
+    button.setAttribute("aria-checked", String(button.dataset.themeChoice === (choice || "system")));
+  }
+}
+
+function storedTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || "system";
+  } catch {
+    return "system";
+  }
+}
+
+for (const button of document.querySelectorAll("[data-theme-choice]")) {
+  button.addEventListener("click", () => {
+    const choice = button.dataset.themeChoice;
+    try {
+      if (choice === "system") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, choice);
+    } catch {
+      // Storage blocked: the choice holds until the page reloads.
+    }
+    applyTheme(choice);
+  });
+}
+applyTheme(storedTheme());
 $("month-next").addEventListener("click", () => moveMonth(1));
 
 renderDate();

@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T22:20:00+01:00",
+  "title": "Design System: Productivity Lock",
+  "extensions": {
+    "colorMeta": {
+      "ink": { "role": "primary", "displayName": "Ink" },
+      "ground": { "role": "neutral", "displayName": "Ground" },
+      "surface": { "role": "neutral", "displayName": "Surface" },
+      "ink-secondary": { "role": "neutral", "displayName": "Secondary ink" },
+      "task-indigo": { "role": "tertiary", "displayName": "Anki indigo" },
+      "task-amber": { "role": "tertiary", "displayName": "LeetCode amber" },
+      "task-green": { "role": "tertiary", "displayName": "Reading green" },
+      "task-violet": { "role": "tertiary", "displayName": "Lernchat violet" },
+      "task-rose": { "role": "tertiary", "displayName": "Sprachchat rose" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page heading beside the ring." },
+      "ring-count": { "displayName": "Ring count", "purpose": "Finished tasks in the ring centre." }
+    },
+    "shadows": [
+      { "name": "ambient", "value": "0 1px 2px rgb(0 0 0 / 0.04), 0 6px 20px -8px rgb(0 0 0 / 0.08)", "purpose": "Lists and panels in light mode only." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Ring fill (1100ms), theme switch, check fill." },
+      { "name": "theme-fade", "value": "300ms ease", "purpose": "Background and text colour when the theme changes." }
+    ],
+    "breakpoints": [
+      { "name": "single-column", "value": "920px" },
+      { "name": "phone", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink pill for the one action a task row offers.",
+      "html": "<button class=\"ds-btn-primary\">Timer starten</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; min-height:34px; padding:0 16px; border:0; border-radius:999px; background:#1d1d1f; color:#fff; font:600 14px 'Host Grotesk', system-ui, sans-serif; cursor:pointer; transition:opacity .15s, transform .1s; } .ds-btn-primary:hover { opacity:.86; } .ds-btn-primary:active { transform:scale(.97); } .ds-btn-primary:focus-visible { outline:2px solid #1d1d1f; outline-offset:2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary action such as Joker einsetzen or Abbrechen.",
+      "html": "<button class=\"ds-btn-quiet\">Joker einsetzen</button>",
+      "css": ".ds-btn-quiet { min-height:34px; padding:0 12px; border:0; border-radius:999px; background:transparent; color:#6e6e73; font:600 14px 'Host Grotesk', system-ui, sans-serif; cursor:pointer; transition:background-color .15s; } .ds-btn-quiet:hover { background:rgb(118 118 128 / .1); color:#1d1d1f; } .ds-btn-quiet:focus-visible { outline:2px solid #1d1d1f; outline-offset:2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Filled input for the joker reason and the reading note; focus ring in the task tint.",
+      "html": "<input class=\"ds-field\" placeholder=\"Kurz begründen\">",
+      "css": ".ds-field { width:100%; padding:10px 12px; border:0; border-radius:10px; background:rgb(118 118 128 / .1); color:#1d1d1f; font:400 15px 'Host Grotesk', system-ui, sans-serif; caret-color:#2f8a4f; } .ds-field::placeholder { color:#8e8e93; } .ds-field:focus { outline:none; background:#fff; box-shadow:inset 0 0 0 1.5px #2f8a4f; }"
+    },
+    {
+      "name": "State Pill",
+      "kind": "chip",
+      "description": "Lock state in the top bar, dot in danger or go colour.",
+      "html": "<span class=\"ds-state\">Gesperrt</span>",
+      "css": ".ds-state { display:inline-flex; align-items:center; gap:6px; padding:3px 10px 3px 8px; border-radius:999px; background:rgb(118 118 128 / .1); color:#6e6e73; font:550 12.5px 'Host Grotesk', system-ui, sans-serif; } .ds-state::before { content:''; width:6px; height:6px; border-radius:50%; background:#c4161c; }"
+    },
+    {
+      "name": "Task Row",
+      "kind": "custom",
+      "refersTo": "task-group",
+      "description": "Row in the grouped task list: tinted icon chip, title, detail, check circle.",
+      "html": "<div class=\"ds-task\"><span class=\"ds-chip\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5zM12 6.5v13\"/></svg></span><div class=\"ds-text\"><strong>Lesen</strong><span>20 Minuten, dann ein Satz dazu</span></div><span class=\"ds-check\"></span></div>",
+      "css": ".ds-task { --tint:#2f8a4f; display:flex; align-items:center; gap:14px; padding:16px 18px; border-radius:16px; background:#fff; font-family:'Host Grotesk', system-ui, sans-serif; } .ds-chip { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; background:color-mix(in srgb, var(--tint) 14%, transparent); color:var(--tint); } .ds-text { flex:1; display:flex; flex-direction:column; } .ds-text strong { font-size:16px; font-weight:600; color:#1d1d1f; } .ds-text span { font-size:14px; color:#6e6e73; } .ds-check { width:26px; height:26px; border-radius:50%; box-shadow:inset 0 0 0 1.75px rgb(118 118 128 / .18); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The quiet ledger",
+    "overview": "A calm daily checklist met in an interrupted moment. Neutral grounds, grouped lists, ink actions; colour only identifies tasks. Light and dark are equal; the page follows the system and a switch pins either.",
+    "keyCharacteristics": [
+      "One segmented ring, one segment per task in its tint",
+      "One grouped list with hairline separators",
+      "Ink pills for primary actions, quiet text buttons for the rest",
+      "Monochrome history drawn as ink density"
+    ],
+    "rules": [
+      { "name": "The Task Owns Its Colour Rule", "body": "A tint only ever marks its own task; chrome, buttons and history stay neutral.", "section": "colors" },
+      { "name": "The No Teal Rule", "body": "Turquoise and teal are out; the owner rejected them.", "section": "colors" }
+    ],
+    "dos": [
+      "Do keep colour inside the task: chip, check, ring segment, timer.",
+      "Do test both themes and 390px width before shipping."
+    ],
+    "donts": [
+      "Don't wrap individual tasks in cards.",
+      "Don't put a label above the main heading.",
+      "Don't reintroduce teal or a coloured page background."
+    ]
+  }
+}

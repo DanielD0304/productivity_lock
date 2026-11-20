@@ -3,6 +3,7 @@ package dev.productivitylock
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
@@ -29,8 +30,13 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = BACKGROUND
-        window.navigationBarColor = BACKGROUND
+        window.statusBarColor = groundColor
+        window.navigationBarColor = groundColor
+        if (!night) {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        }
         handle(intent)
     }
 
@@ -67,7 +73,14 @@ class MainActivity : Activity() {
         return enabled?.split(':')?.any { it.startsWith("$packageName/") } == true
     }
 
-    private fun text(value: String, size: Float = 16f, color: Int = Color.WHITE) = TextView(this).apply {
+    // Follows the phone's light or dark mode, in the same greys as the checklist page.
+    private val night get() =
+        (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    private val groundColor get() = if (night) Color.BLACK else Color.rgb(245, 245, 247)
+    private val primaryText get() = if (night) Color.rgb(245, 245, 247) else Color.rgb(29, 29, 31)
+    private val secondaryText get() = if (night) Color.rgb(161, 161, 166) else Color.rgb(110, 110, 115)
+
+    private fun text(value: String, size: Float = 16f, color: Int = primaryText) = TextView(this).apply {
         text = value
         textSize = size
         setTextColor(color)
@@ -88,24 +101,24 @@ class MainActivity : Activity() {
             hint = "100.x.y.z:47616"
             setText(StatusStore.address(this@MainActivity))
             inputType = InputType.TYPE_TEXT_VARIATION_URI
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
+            setTextColor(primaryText)
+            setHintTextColor(secondaryText)
         }
         val token = EditText(this).apply {
             hint = "Token"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.GRAY)
+            setTextColor(primaryText)
+            setHintTextColor(secondaryText)
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
+            setBackgroundColor(groundColor)
             setPadding(dp(24), dp(48), dp(24), dp(24))
             addView(text("Mit dem PC verbinden", 24f))
             addView(text(
                 "Am PC im Projektordner „python -m app.phone“ ausführen und den QR-Code mit der Kamera scannen. " +
                     "Oder Adresse und Token hier eintragen. Tailscale muss auf PC und Handy laufen.",
-                15f, Color.LTGRAY,
+                15f, secondaryText,
             ))
             addView(address)
             addView(token)
@@ -125,14 +138,14 @@ class MainActivity : Activity() {
         val address = StatusStore.address(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(BACKGROUND)
+            setBackgroundColor(groundColor)
             fitsSystemWindows = true
         }
         if (!serviceEnabled()) {
             root.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(16), dp(12), dp(16), dp(4))
-                setBackgroundColor(Color.rgb(90, 30, 30))
+                setBackgroundColor(if (night) Color.rgb(70, 24, 24) else Color.rgb(255, 228, 226))
                 addView(text("Die Sperre ist aus. Schalte „Productivity Lock“ in den Bedienungshilfen ein.", 15f))
                 addView(button("Bedienungshilfen öffnen") {
                     startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -140,7 +153,7 @@ class MainActivity : Activity() {
             })
         }
         val web = webView ?: WebView(this).apply {
-            setBackgroundColor(BACKGROUND)
+            setBackgroundColor(groundColor)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             webViewClient = object : WebViewClient() {
@@ -174,7 +187,9 @@ class MainActivity : Activity() {
         val state = if (StatusStore.isUnlocked(status)) "Heute schon alles erledigt: frei." else "Gesperrt."
         val since = status?.optString("day")?.takeIf { it.isNotEmpty() }?.let { "Letzter Stand vom Lerntag $it." } ?: "Noch kein Stand vom PC."
         return """
-            <html><body style="background:#1c1c1e;color:#fff;font-family:sans-serif;padding:24px">
+            <html><head><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+            <style>body{background:#f5f5f7;color:#1d1d1f}@media (prefers-color-scheme:dark){body{background:#000;color:#f5f5f7}}</style></head>
+            <body style="font-family:sans-serif;padding:24px">
             <h2>PC nicht erreichbar</h2>
             <p>$state $since</p>
             <p style="color:#aaa">Läuft der PC mit Tailscale? Neuer Versuch:</p>
@@ -192,6 +207,5 @@ class MainActivity : Activity() {
 
     companion object {
         const val EXTRA_BLOCKED = "blocked"
-        private val BACKGROUND = Color.rgb(28, 28, 30)
     }
 }

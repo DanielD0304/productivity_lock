@@ -2,55 +2,65 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <title>Productivity Lock</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400..700&display=swap">
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="locked.css">
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
-        </span>
+        <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="3"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>
         <span class="brand-name">Productivity Lock</span>
         <span class="state" id="state">Gesperrt</span>
       </div>
       <div class="topbar-end">
         <span class="date" id="date"></span>
-        <button class="ghost refresh" id="refresh" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
-          Aktualisieren
+        <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Darstellung">
+          <button type="button" role="radio" data-theme-choice="system" aria-label="Wie das System" title="Wie das System">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" class="fill"/></svg>
+          </button>
+          <button type="button" role="radio" data-theme-choice="light" aria-label="Hell" title="Hell">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.75"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M6 18l1.4-1.4M16.6 7.4L18 6"/></svg>
+          </button>
+          <button type="button" role="radio" data-theme-choice="dark" aria-label="Dunkel" title="Dunkel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.2A7.8 7.8 0 0 1 9.8 4.5a7.8 7.8 0 1 0 9.7 9.7z"/></svg>
+          </button>
+        </div>
+        <button class="icon-btn" id="refresh" type="button" aria-label="Aktualisieren" title="Aktualisieren">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4.75h-4.75"/></svg>
         </button>
       </div>
     </header>
 
     <main class="layout">
-      <section class="primary" aria-labelledby="title">
-        <div class="intro">
-          <div class="intro-text">
-            <h1 id="title">Erst lernen, dann der Rest.</h1>
-            <p class="progress-line"><strong id="count-done">–</strong><span id="count-total"></span> <span id="progress">Wird geprüft …</span></p>
+      <section class="today" aria-labelledby="title">
+        <div class="hero">
+          <div class="ring-wrap">
+            <svg class="ring" id="ring" viewBox="0 0 200 200" aria-hidden="true"></svg>
+            <p class="ring-count" aria-live="polite"><strong id="count-done">–</strong><span id="count-total"></span></p>
           </div>
-          <div class="ring-wrap" aria-hidden="true">
-            <svg class="ring" id="ring" viewBox="0 0 200 200"></svg>
+          <div class="hero-text">
+            <h1 id="title">Erst lernen, dann der Rest.</h1>
+            <p class="lede" id="progress">Wird geprüft …</p>
           </div>
         </div>
 
-        <p class="banner" id="offline" hidden>
-          Der Lock-Dienst läuft nicht, deshalb bleibt alles gesperrt. Starte den PC neu oder führe
+        <p class="notice" id="offline" hidden>
+          Der Lock-Dienst antwortet nicht, deshalb bleibt alles gesperrt. Starte den PC neu oder führe
           <code>install_autostart.ps1</code> aus.
         </p>
 
-        <div class="unlocked" id="links" hidden>
-          <p class="unlocked-text">Alles erledigt. Die Seiten sind wieder offen.</p>
-          <div class="unlocked-links">
-            <a class="pill-link" href="https://www.youtube.com/">YouTube</a>
-            <a class="pill-link" href="https://www.netflix.com/">Netflix</a>
-            <a class="pill-link" href="https://www.instagram.com/">Instagram</a>
+        <div class="open-sites" id="links" hidden>
+          <p>Die Seiten sind wieder offen.</p>
+          <div class="site-links">
+            <a href="https://www.youtube.com/">YouTube</a>
+            <a href="https://www.netflix.com/">Netflix</a>
+            <a href="https://www.instagram.com/">Instagram</a>
+            <a href="https://www.linkedin.com/">LinkedIn</a>
+            <a href="https://www.reddit.com/">Reddit</a>
           </div>
         </div>
 
@@ -65,38 +75,38 @@
                 <h3 class="task-title"></h3>
                 <p class="detail"></p>
               </div>
+              <span class="timer" hidden></span>
               <span class="mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M7 12.5l3.2 3.2L17 9"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M7.5 12.5l3 3 6-6.5"/></svg>
               </span>
             </div>
             <div class="body">
               <p class="error check-error" hidden></p>
               <p class="hint hint-text" hidden></p>
-              <a class="hint hint-link" target="_blank" rel="noreferrer" hidden></a>
-              <p class="timer" hidden></p>
+              <a class="hint-link" target="_blank" rel="noreferrer" hidden></a>
               <div class="actions">
-                <button class="primary-btn action" type="button" hidden></button>
-                <button class="primary-btn start" type="button" hidden>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></svg>Timer starten
+                <button class="btn btn-primary action" type="button" hidden></button>
+                <button class="btn btn-primary start" type="button" hidden>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 6v12l9.5-6z"/></svg>Timer starten
                 </button>
-                <button class="ghost joker-open" type="button" hidden>Joker einsetzen</button>
+                <button class="btn btn-quiet joker-open" type="button" hidden>Joker einsetzen</button>
               </div>
               <p class="error action-error" hidden></p>
               <form class="joker-form" hidden>
-                <label class="joker-label">Warum brauchst du heute den Joker?</label>
-                <input class="joker-reason" type="text" maxlength="200" autocomplete="off" placeholder="Kurz begründen">
+                <label class="field-label joker-label">Warum brauchst du heute den Joker?</label>
+                <input class="field joker-reason" type="text" maxlength="200" autocomplete="off" placeholder="Kurz begründen">
                 <p class="error joker-error" hidden></p>
                 <div class="actions">
-                  <button class="primary-btn" type="submit">Aufgabe erlassen</button>
-                  <button class="ghost joker-cancel" type="button">Abbrechen</button>
+                  <button class="btn btn-primary" type="submit">Aufgabe erlassen</button>
+                  <button class="btn btn-quiet joker-cancel" type="button">Abbrechen</button>
                 </div>
               </form>
               <form class="note-form" hidden>
-                <label class="note-label"></label>
-                <textarea class="note" rows="3" maxlength="1000" placeholder="Ein, zwei Sätze"></textarea>
+                <label class="field-label note-label"></label>
+                <textarea class="field note" rows="3" maxlength="1000" placeholder="Ein, zwei Sätze"></textarea>
                 <p class="error note-error" hidden></p>
                 <div class="actions">
-                  <button class="primary-btn" type="submit">Abschließen</button>
+                  <button class="btn btn-primary" type="submit">Abschließen</button>
                 </div>
               </form>
             </div>
@@ -105,40 +115,41 @@
       </section>
 
       <aside class="side" id="history" hidden>
-        <section class="panel stats" aria-label="Serie">
-          <div class="stat">
-            <span class="stat-label">Serie</span>
-            <strong id="streak"></strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Rekord</span>
-            <strong id="best"></strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label">Diese Woche</span>
-            <strong id="week-done"></strong>
-          </div>
+        <section class="panel" aria-labelledby="streak-title">
+          <h2 class="section-title" id="streak-title">Verlauf</h2>
+          <dl class="stats">
+            <div class="stat">
+              <dt>Serie</dt>
+              <dd id="streak"></dd>
+            </div>
+            <div class="stat">
+              <dt>Rekord</dt>
+              <dd id="best"></dd>
+            </div>
+            <div class="stat">
+              <dt>Woche</dt>
+              <dd id="week-done"></dd>
+            </div>
+          </dl>
           <p class="footnote" id="week"></p>
-        </section>
 
-        <section class="panel calendar-panel" aria-label="Verlauf">
           <div class="month-nav">
-            <h2 class="month-label" id="month-label"></h2>
+            <h3 class="month-label" id="month-label"></h3>
             <div class="month-buttons">
-              <button class="nav" id="month-prev" type="button" aria-label="Voriger Monat">
-                <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+              <button class="icon-btn small" id="month-prev" type="button" aria-label="Voriger Monat">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>
               </button>
-              <button class="nav" id="month-next" type="button" aria-label="Nächster Monat">
-                <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+              <button class="icon-btn small" id="month-next" type="button" aria-label="Nächster Monat">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>
               </button>
             </div>
           </div>
           <div class="calendar" id="calendar"></div>
           <ul class="legend">
-            <li><span class="swatch s4"></span>Alles</li>
-            <li><span class="swatch s2"></span>Teilweise</li>
-            <li><span class="swatch s0"></span>Nichts</li>
-            <li><span class="swatch sj"></span>Joker</li>
+            <li><span class="swatch lv4"></span>Alles</li>
+            <li><span class="swatch lv2"></span>Teilweise</li>
+            <li><span class="swatch lv0"></span>Nichts</li>
+            <li><span class="swatch joker"></span>Joker</li>
           </ul>
         </section>
       </aside>
