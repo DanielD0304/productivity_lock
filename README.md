@@ -136,6 +136,9 @@ zeigt dieselbe Checkliste wie am PC. Lese-Timer, Notizen und Joker gehen auch am
 Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus, gilt der letzte bekannte Stand, und ab
 4 Uhr ist wieder gesperrt, bis der PC etwas anderes meldet.
 
+Das Handy fragt nicht ständig nach, das schont den Akku. Es holt den Stand nur, wenn du in der App auf
+**Synchronisieren** tippst oder eine gesperrte App öffnest. Ist der Tag dann erledigt, geht die App gleich wieder auf.
+
 1. Tailscale auf PC und Handy installieren und mit demselben Konto anmelden.
 2. Den Dienst neu starten. Er öffnet den Handy-Zugang auf Port 47616, nur auf der Tailscale-Adresse und nur mit Token.
    Fragt die Windows-Firewall nach, den Zugriff erlauben.

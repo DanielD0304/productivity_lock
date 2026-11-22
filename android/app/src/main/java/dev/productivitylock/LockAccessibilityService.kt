@@ -13,20 +13,11 @@ class LockAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var foreground: String? = null
 
-    private val poll = object : Runnable {
-        override fun run() {
-            refresh()
-            // Every minute is enough for 4 a.m. and costs next to no battery; opening a blocked app asks at once.
-            handler.postDelayed(this, POLL_MS)
-        }
-    }
-
-    override fun onServiceConnected() {
-        handler.post(poll)
-    }
+    // No polling: the phone asks the PC only when a blocked app opens or when "Synchronisieren" is tapped.
+    // A cached "done" stops counting at 4 a.m. by itself, because it belongs to the previous learning day.
 
     override fun onDestroy() {
-        handler.removeCallbacks(poll)
+        handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
@@ -34,8 +25,9 @@ class LockAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val app = event.packageName?.toString() ?: return
-        if (app in BROWSER_URL_BARS) {
-            // Pages load and change without a new window; check the address bar at most every 300 ms.
+        if (app in BROWSER_URL_BARS && !StatusStore.isUnlocked(StatusStore.cached(this))) {
+            // Pages load and change without a new window; check the address bar at most once a second,
+            // and not at all once the day is done.
             browser = app
             if (!browserCheckPending) {
                 browserCheckPending = true
@@ -71,23 +63,20 @@ class LockAccessibilityService : AccessibilityService() {
         handler.removeCallbacks(browserCheck)
         browserCheckPending = true
         handler.postDelayed(browserCheck, BROWSER_RECHECK_MS)
-        refresh()
     }
 
     /**
-     * Fetches the status off the main thread and closes a blocked app that is still open, e.g. after 4 a.m.
+     * Asks the PC once, off the main thread, right after a blocked app was closed.
      * The block itself goes by the cached status; if the fresh one says the day is done, [reopen] comes back.
      */
-    private fun refresh(reopen: String? = null) {
+    private fun refresh(reopen: String) {
         thread {
             val status = StatusStore.fetch(this)
             handler.post {
-                if (reopen != null && StatusStore.isUnlocked(status)) {
+                if (StatusStore.isUnlocked(status)) {
                     packageManager.getLaunchIntentForPackage(reopen)?.let {
                         startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
-                } else {
-                    foreground?.let { enforce(it) }
                 }
             }
         }
@@ -108,8 +97,7 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val POLL_MS = 60_000L
-        private const val BROWSER_CHECK_DELAY_MS = 300L
+        private const val BROWSER_CHECK_DELAY_MS = 1_000L
         private const val BROWSER_RECHECK_MS = 1_000L
 
         /** The address bar of each supported browser; others are not checked. */

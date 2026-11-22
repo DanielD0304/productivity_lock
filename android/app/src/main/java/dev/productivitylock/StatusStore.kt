@@ -65,8 +65,19 @@ object StatusStore {
             .apply()
     }
 
-    fun cached(context: Context): JSONObject? =
-        prefs(context).getString("status", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+    // Parsed once per stored answer: the accessibility service asks on every window change.
+    private var parsedFrom: String? = null
+    private var parsed: JSONObject? = null
+
+    @Synchronized
+    fun cached(context: Context): JSONObject? {
+        val raw = prefs(context).getString("status", null)
+        if (raw != parsedFrom) {
+            parsedFrom = raw
+            parsed = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
+        }
+        return parsed
+    }
 
     /** Asks the PC; on success the answer becomes the new cached status. Blocks, so never call it on the UI thread. */
     fun fetch(context: Context): JSONObject? {

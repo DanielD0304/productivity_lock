@@ -25,6 +25,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import java.time.LocalDateTime
+import kotlin.concurrent.thread
 
 /** Shows the checklist from the PC; without a connection it asks for address and token first. */
 class MainActivity : Activity() {
@@ -48,8 +49,17 @@ class MainActivity : Activity() {
         handle(intent)
     }
 
+    // The checklist page polls while it is visible; in the background it must stop, or the phone stays busy.
+    override fun onPause() {
+        webView?.onPause()
+        webView?.pauseTimers()
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        webView?.resumeTimers()
+        webView?.onResume()
         // Coming back from the accessibility settings: drop the banner if the service is on now.
         if (StatusStore.isConfigured(this)) showChecklist()
     }
@@ -200,9 +210,32 @@ class MainActivity : Activity() {
         root.addView(web, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.END
+            addView(button("Synchronisieren") { sync() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
             addView(button("Verbindung ändern") { showSetup() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         })
         setContentView(root)
+    }
+
+    /** The only way the lock learns about finished tasks, besides opening a blocked app. */
+    private fun sync() {
+        Toast.makeText(this, "Synchronisiere …", Toast.LENGTH_SHORT).show()
+        thread {
+            val status = StatusStore.fetch(this)
+            runOnUiThread {
+                val message = when {
+                    status == null -> "PC nicht erreichbar. Es bleibt beim letzten Stand."
+                    StatusStore.isUnlocked(status) -> "Alles erledigt. Die Apps sind frei."
+                    else -> {
+                        val checks = status.optJSONObject("checks")
+                        val names = checks?.keys()?.asSequence()?.toList().orEmpty()
+                        val done = names.count { checks!!.optJSONObject(it)?.optBoolean("done") == true }
+                        "Noch gesperrt: $done von ${names.size} erledigt."
+                    }
+                }
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                webView?.reload()
+            }
+        }
     }
 
     private fun offlinePage(address: String): String {
