@@ -1059,6 +1059,10 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.launches, [])
         self.assertEqual(self.request("/status", origin="chrome-extension://other")[0], 403)
 
+    def test_pc_access_never_serves_the_app(self):
+        self.assertEqual(self.server.apk_dir, None)
+        self.assertEqual(self.request("/app/latest.apk")[0], 404)
+
     def test_extension_id_matches_manifest_key(self):
         root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extension")
         with open(os.path.join(root, "manifest.json"), encoding="utf-8") as file:
@@ -1206,6 +1210,21 @@ class PhoneServerTest(unittest.TestCase):
         code, body = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"})
         self.assertEqual(code, 200)
         self.assertTrue(json.loads(body)["active"])
+
+    def test_latest_app_is_served_with_its_version(self):
+        apk_dir = os.path.join(self.dir, "apk")
+        os.makedirs(apk_dir)
+        with open(os.path.join(apk_dir, "output-metadata.json"), "w", encoding="utf-8") as file:
+            json.dump({"elements": [{"versionCode": 7, "versionName": "1.6", "outputFile": "app-release.apk"}]}, file)
+        self.assertEqual(self.request("/app/version")[0], 404)
+        self.server.apk_dir = apk_dir
+        self.assertEqual(self.request("/app/version")[0], 404)  # Metadata without the APK itself.
+        with open(os.path.join(apk_dir, "app-release.apk"), "wb") as file:
+            file.write(b"PK-apk")
+        code, body = self.request("/app/version")
+        self.assertEqual((code, json.loads(body)), (200, {"versionCode": 7, "versionName": "1.6"}))
+        self.assertEqual(self.request("/app/latest.apk"), (200, b"PK-apk"))
+        self.assertEqual(self.request("/app/latest.apk", token=None)[0], 403)
 
     def test_foreign_page_cannot_ride_the_cookie(self):
         code, _ = self.request("/tasks/anki/joker", method="POST", body={"reason": "krank"}, cookie=True,

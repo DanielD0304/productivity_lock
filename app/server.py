@@ -33,7 +33,7 @@ class LockServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, service, static_dir, port=PORT, launchers=None, host="127.0.0.1", token=None,
-                 phone=None):
+                 phone=None, apk_dir=None):
         """With a token the server is the phone's access: any host, but every request needs the token."""
         super().__init__((host, port), Handler)
         self.service = service
@@ -41,6 +41,7 @@ class LockServer(ThreadingHTTPServer):
         self.static_dir = static_dir
         self.token = token
         self.phone = phone or {}
+        self.apk_dir = apk_dir if token else None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -111,6 +112,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.server.token:
                 self._phone_status(status)
             self._send_json(200, status)
+        elif url.path in ("/app/version", "/app/latest.apk") and self.server.apk_dir:
+            self._send_app(url.path)
         elif url.path in STATIC_FILES:
             name, content_type = STATIC_FILES[url.path]
             with open(os.path.join(self.server.static_dir, name), "rb") as file:
@@ -123,6 +126,35 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         else:
             self._send_json(404, {"error": "Nicht gefunden"})
+
+    def _latest_apk(self):
+        """The APK Gradle built last, with the version it carries; None when there is none."""
+        try:
+            with open(os.path.join(self.server.apk_dir, "output-metadata.json"), encoding="utf-8") as file:
+                element = json.load(file)["elements"][0]
+            path = os.path.join(self.server.apk_dir, os.path.basename(element["outputFile"]))
+            if os.path.isfile(path):
+                return {"versionCode": element["versionCode"], "versionName": element["versionName"]}, path
+        except (OSError, ValueError, KeyError, IndexError):
+            pass
+        return None, None
+
+    def _send_app(self, path):
+        # Phone access only: the app updates itself from the PC instead of a file sent around by hand.
+        info, apk = self._latest_apk()
+        if info is None:
+            self._send_json(404, {"error": "Keine App gebaut"})
+        elif path == "/app/version":
+            self._send_json(200, info)
+        else:
+            with open(apk, "rb") as file:
+                body = file.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.android.package-archive")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
 
     def _phone_status(self, status):
         # Chats open on the PC, so the phone shows them without a button.

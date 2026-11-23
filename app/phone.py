@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from .server import PHONE_PORT, LockServer
 
 RETRY_SECONDS = 30
+APK_DIR = ("android", "app", "build", "outputs", "apk", "release")
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 TAILSCALE_PATHS = [
     r"C:\Program Files\Tailscale\tailscale.exe",
@@ -84,7 +85,8 @@ def serve_phone(service, static_dir, config, data_dir, find_ip=tailscale_ip, sle
             try:
                 server = LockServer(service, static_dir, port=settings["port"], host=host, token=token,
                                     phone={"blocked_apps": settings["blocked_apps"],
-                                           "blocked_sites": settings["blocked_sites"]})
+                                           "blocked_sites": settings["blocked_sites"]},
+                                    apk_dir=os.path.join(os.path.dirname(static_dir), *APK_DIR))
             except OSError as error:
                 logging.warning("Handy-Zugang auf %s:%s nicht möglich: %s", host, settings["port"], error)
             else:

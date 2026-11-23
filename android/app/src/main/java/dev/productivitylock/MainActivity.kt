@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
@@ -49,22 +50,28 @@ class MainActivity : Activity() {
         handle(intent)
     }
 
-    // The checklist page polls while it is visible; in the background it must stop, or the phone stays busy.
-    override fun onPause() {
-        webView?.onPause()
-        webView?.pauseTimers()
-        super.onPause()
+    // The checklist page polls while it is visible. Out of sight the WebView is thrown away entirely and built
+    // fresh on return, which also shows the current state. (pauseTimers() froze the page for every WebView.)
+    override fun onStop() {
+        webView?.let { web ->
+            (web.parent as? LinearLayout)?.removeView(web)
+            web.destroy()
+        }
+        webView = null
+        super.onStop()
     }
 
     override fun onResume() {
         super.onResume()
-        webView?.resumeTimers()
-        webView?.onResume()
         // Coming back from the accessibility settings: drop the banner if the service is on now.
         if (StatusStore.isConfigured(this)) showChecklist()
     }
 
     private fun handle(intent: Intent) {
+        if (intent.action == Updater.ACTION_INSTALL_STATUS) {
+            installStatus(intent)
+            intent.action = null
+        }
         val data = intent.data
         if (data?.scheme == "productivitylock" && data.host == "pair") {
             // Handled once; a rotation must not ask again.
@@ -211,9 +218,50 @@ class MainActivity : Activity() {
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.END
             addView(button("Synchronisieren") { sync() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
-            addView(button("Verbindung ändern") { showSetup() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+            addView(button("Update") { update() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+            addView(button("Verbindung") { showSetup() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
         })
         setContentView(root)
+    }
+
+    /** Asks the PC for a newer build and installs it; Android shows its own confirmation first. */
+    private fun update() {
+        if (!packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(this, "Erlaube Productivity Lock einmal, Apps zu installieren, dann tippe nochmal auf Update.",
+                Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+        Toast.makeText(this, "Suche nach Updates …", Toast.LENGTH_SHORT).show()
+        thread {
+            val latest = Updater.latest(this)
+            val installed = Updater.installedVersion(this)
+            when {
+                latest == null -> toast("PC nicht erreichbar oder keine App gebaut.")
+                latest.versionCode <= installed -> toast("Die App ist aktuell.")
+                else -> {
+                    toast("Lade Version ${latest.versionName} …")
+                    runCatching { Updater.install(this) }.onFailure { toast("Update fehlgeschlagen: ${it.message}") }
+                }
+            }
+        }
+    }
+
+    private fun toast(message: String) = runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+
+    private fun installStatus(intent: Intent) {
+        when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
+            PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                @Suppress("DEPRECATION")
+                val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+                confirm?.let { startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+            PackageInstaller.STATUS_SUCCESS -> Toast.makeText(this, "Update installiert", Toast.LENGTH_SHORT).show()
+            else -> {
+                val reason = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "abgebrochen"
+                Toast.makeText(this, "Update nicht installiert: $reason", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     /** The only way the lock learns about finished tasks, besides opening a blocked app. */

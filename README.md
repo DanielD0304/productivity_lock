@@ -139,6 +139,10 @@ Das Handy fragt den PC über [Tailscale](https://tailscale.com/). Ist der PC aus
 Das Handy fragt nicht ständig nach, das schont den Akku. Es holt den Stand nur, wenn du in der App auf
 **Synchronisieren** tippst oder eine gesperrte App öffnest. Ist der Tag dann erledigt, geht die App gleich wieder auf.
 
+Updates holt sich die App selbst: Nach `android\gradlew.bat -p android assembleRelease` am PC tippst du in der App auf
+**Update**. Sie lädt die neue Version vom PC, Android fragt vor der Installation nach. Beim ersten Mal musst du
+erlauben, dass Productivity Lock Apps installieren darf.
+
 1. Tailscale auf PC und Handy installieren und mit demselben Konto anmelden.
 2. Den Dienst neu starten. Er öffnet den Handy-Zugang auf Port 47616, nur auf der Tailscale-Adresse und nur mit Token.
    Fragt die Windows-Firewall nach, den Zugriff erlauben.
